@@ -51,7 +51,7 @@ function Dashboard({ session }) {
 
 function PublicRegistration({ code, onHome }) {
   const [event, setEvent] = useState(null), [count, setCount] = useState(0), [form, setForm] = useState(emptyPlayer), [message, setMessage] = useState(''), [success, setSuccess] = useState(false), [loading, setLoading] = useState(true)
-  useEffect(() => { supabase.from('events').select('*').eq('event_code', code.toUpperCase()).eq('status', 'open').single().then(async ({ data }) => { setEvent(data); if (data) { const result = await supabase.from('player_registrations').select('*', { count: 'exact', head: true }).eq('event_id', data.id); setCount(result.count || 0) } setLoading(false) }) }, [code])
+  useEffect(() => { supabase.from('events').select('*').eq('event_code', code.toUpperCase()).eq('status', 'open').single().then(async ({ data }) => { setEvent(data); if (data) { const result = await supabase.rpc('get_event_registration_count', { p_event_id: data.id }); setCount(result.data || 0) } setLoading(false) }) }, [code])
   const spots = useMemo(() => event?.registration_limit ? Math.max(event.registration_limit - count, 0) : null, [event, count])
   async function submit(e) { e.preventDefault(); setMessage(''); if (spots === 0) return setMessage('Registration is full. Please contact the organizer.'); const { error } = await supabase.from('player_registrations').insert({ ...form, event_id: event.id }); if (error) setMessage(error.code === '23505' ? 'This email is already registered for the event.' : error.message); else setSuccess(true) }
   if (loading) return <main className="public-registration"><p>Loading event…</p></main>
