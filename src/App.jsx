@@ -1,267 +1,68 @@
-import { useEffect, useState } from 'react'
-import { CalendarDays, Heart, LogOut, ShieldCheck, Sparkles, Trophy, Users } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, CheckCircle2, Copy, Heart, LogOut, MapPin, Plus, ShieldCheck, Sparkles, Trophy, Users } from 'lucide-react'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 
-const emptyProfile = {
-  full_name: '',
-  organization_name: '',
-  phone: '',
-  city: '',
-  country: 'Philippines',
-}
+const emptyProfile = { full_name: '', organization_name: '', phone: '', city: '', country: 'Philippines' }
+const emptyEvent = { name: '', description: '', venue: '', city: '', event_date: '', start_time: '', registration_limit: 32, status: 'open' }
+const emptyPlayer = { full_name: '', email: '', phone: '', skill_level: 'beginner' }
 
 function Header({ session, onSignOut }) {
-  return (
-    <header className="topbar">
-      <a className="brand" href="/">
-        <span className="brand-mark">P</span>
-        <span>PickleFlow</span>
-      </a>
-      {session && (
-        <button className="button button-ghost" onClick={onSignOut}>
-          <LogOut size={17} /> Sign out
-        </button>
-      )}
-    </header>
-  )
+  return <header className="topbar"><a className="brand" href="/"><span className="brand-mark">P</span><span>PickleFlow</span></a>{session && <button className="button button-ghost" onClick={onSignOut}><LogOut size={17} /> Sign out</button>}</header>
 }
 
 function Landing({ onStart }) {
   const donationUrl = import.meta.env.VITE_DONATION_URL
-
-  return (
-    <>
-      <main>
-        <section className="hero">
-          <div className="hero-copy">
-            <span className="eyebrow"><Sparkles size={15} /> Free for organizers</span>
-            <h1>Run pickleball events without the spreadsheet shuffle.</h1>
-            <p>
-              Create your organizer profile today. Player registration, event tools,
-              queues, standings, and court management will follow as PickleFlow grows.
-            </p>
-            <div className="hero-actions">
-              <button className="button button-primary" onClick={onStart}>Register as an organizer</button>
-              <a className="button button-secondary" href="#about">See what’s coming</a>
-            </div>
-          </div>
-          <div className="court-card" aria-label="Pickleball court illustration">
-            <div className="court-net" />
-            <div className="ball">●</div>
-            <div className="court-copy">
-              <strong>Organize. Play. Connect.</strong>
-              <span>Built for clubs and community events.</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="feature-grid" id="about">
-          <article><Users /><h3>Organizer profiles</h3><p>Keep club and contact information in one secure place.</p></article>
-          <article><CalendarDays /><h3>Event tools next</h3><p>A clean foundation for registration, schedules, courts, and queues.</p></article>
-          <article><Trophy /><h3>Built to grow</h3><p>Standings, rankings, loyalty, and game-day displays can be added later.</p></article>
-        </section>
-
-        <section className="donation-card">
-          <div className="donation-icon"><Heart /></div>
-          <div>
-            <span className="eyebrow">Community supported</span>
-            <h2>PickleFlow is free while we build it with organizers.</h2>
-            <p>Donations are optional and help cover hosting, development, and future game-day features.</p>
-          </div>
-          {donationUrl ? (
-            <a className="button button-donate" href={donationUrl} target="_blank" rel="noreferrer">Support PickleFlow</a>
-          ) : (
-            <button className="button button-donate" onClick={() => alert('Thank you! The donation option will be available soon.')}>I’d like to support</button>
-          )}
-        </section>
-      </main>
-      <footer>PickleFlow · A PAOTECHS-powered community project</footer>
-    </>
-  )
+  return <><main><section className="hero"><div className="hero-copy"><span className="eyebrow"><Sparkles size={15} /> Free for organizers</span><h1>Run pickleball events without the spreadsheet shuffle.</h1><p>Create events, share a player-registration link, and keep every signup organized in one place.</p><div className="hero-actions"><button className="button button-primary" onClick={onStart}>Register as an organizer</button><a className="button button-secondary" href="#about">See how it works</a></div></div><div className="court-card" aria-label="Pickleball court illustration"><div className="court-net" /><div className="ball">●</div><div className="court-copy"><strong>Organize. Play. Connect.</strong><span>Built for clubs and community events.</span></div></div></section><section className="feature-grid" id="about"><article><Users /><h3>Organizer accounts</h3><p>Keep club and contact information in one secure place.</p></article><article><CalendarDays /><h3>Create events</h3><p>Set the date, venue, start time, and player capacity.</p></article><article><Trophy /><h3>Register players</h3><p>Share one simple link—players do not need an account.</p></article></section><section className="donation-card"><div className="donation-icon"><Heart /></div><div><span className="eyebrow">Community supported</span><h2>PickleFlow is free while we build it with organizers.</h2><p>Donations are optional and help cover hosting, development, and future game-day features.</p></div>{donationUrl ? <a className="button button-donate" href={donationUrl} target="_blank" rel="noreferrer">Support PickleFlow</a> : <button className="button button-donate" onClick={() => alert('Thank you! The donation option will be available soon.')}>I’d like to support</button>}</section></main><footer>PickleFlow · A PAOTECHS-powered community project</footer></>
 }
 
 function AuthPanel({ onClose }) {
-  const [mode, setMode] = useState('signup')
-  const [form, setForm] = useState({ ...emptyProfile, email: '', password: '' })
-  const [message, setMessage] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [mode, setMode] = useState('signup'), [form, setForm] = useState({ ...emptyProfile, email: '', password: '' }), [message, setMessage] = useState(''), [busy, setBusy] = useState(false)
+  const update = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  async function submit(e) { e.preventDefault(); setBusy(true); setMessage(''); try { if (!isSupabaseConfigured) throw new Error('Supabase is not configured.'); if (mode === 'signup') { const { error } = await supabase.auth.signUp({ email: form.email, password: form.password, options: { data: { full_name: form.full_name, organization_name: form.organization_name, phone: form.phone, city: form.city, country: form.country } } }); if (error) throw error; setMessage('Registration received. Please check your email to confirm your account.') } else { const { error } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password }); if (error) throw error } } catch (error) { setMessage(error.message) } finally { setBusy(false) } }
+  return <div className="modal-backdrop"><section className="auth-card" role="dialog" aria-modal="true"><button className="close-button" onClick={onClose} aria-label="Close">×</button><span className="eyebrow">{mode === 'signup' ? 'Organizer registration' : 'Welcome back'}</span><h2>{mode === 'signup' ? 'Create your free account' : 'Sign in to PickleFlow'}</h2><p className="muted">No subscription or payment is required.</p><form onSubmit={submit}>{mode === 'signup' && <><label>Full name<input required name="full_name" value={form.full_name} onChange={update} /></label><label>Club or organization<input required name="organization_name" value={form.organization_name} onChange={update} /></label><div className="form-row"><label>City<input name="city" value={form.city} onChange={update} /></label><label>Country<input name="country" value={form.country} onChange={update} /></label></div><label>Phone number <span>(optional)</span><input name="phone" value={form.phone} onChange={update} /></label></>}<label>Email<input required type="email" name="email" value={form.email} onChange={update} /></label><label>Password<input required minLength="8" type="password" name="password" value={form.password} onChange={update} /></label>{message && <div className="form-message">{message}</div>}<button className="button button-primary button-full" disabled={busy}>{busy ? 'Please wait…' : mode === 'signup' ? 'Create free organizer account' : 'Sign in'}</button></form><button className="text-button" onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setMessage('') }}>{mode === 'signup' ? 'Already registered? Sign in' : 'Need an account? Register'}</button></section></div>
+}
 
-  const update = (event) => setForm({ ...form, [event.target.name]: event.target.value })
+function EventForm({ onCreated, onCancel, defaultCity }) {
+  const [form, setForm] = useState({ ...emptyEvent, city: defaultCity || '' }), [message, setMessage] = useState(''), [busy, setBusy] = useState(false)
+  const update = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  async function submit(e) { e.preventDefault(); setBusy(true); setMessage(''); const { data: { user } } = await supabase.auth.getUser(); const payload = { ...form, organizer_user_id: user.id, registration_limit: form.registration_limit ? Number(form.registration_limit) : null, start_time: form.start_time || null }; const { data, error } = await supabase.from('events').insert(payload).select().single(); if (error) setMessage(error.message); else onCreated(data); setBusy(false) }
+  return <section className="profile-card event-form-card"><div className="section-title"><div><span className="eyebrow">New event</span><h2>Create a pickleball event</h2></div><button className="text-button compact" onClick={onCancel}>Cancel</button></div><form onSubmit={submit}><label>Event name<input required name="name" value={form.name} onChange={update} placeholder="Saturday Open Play" /></label><label>Description <span>(optional)</span><textarea name="description" value={form.description} onChange={update} placeholder="Who should join and what players should expect" /></label><label>Venue<input required name="venue" value={form.venue} onChange={update} placeholder="Club or court name" /></label><div className="form-row"><label>City<input name="city" value={form.city} onChange={update} /></label><label>Player limit<input type="number" min="1" name="registration_limit" value={form.registration_limit} onChange={update} /></label></div><div className="form-row"><label>Event date<input required type="date" name="event_date" value={form.event_date} onChange={update} /></label><label>Start time<input type="time" name="start_time" value={form.start_time} onChange={update} /></label></div>{message && <div className="form-message error">{message}</div>}<button className="button button-primary" disabled={busy}>{busy ? 'Creating…' : 'Create event'}</button></form></section>
+}
 
-  async function submit(event) {
-    event.preventDefault()
-    setBusy(true)
-    setMessage('')
+function EventList({ events, onSelect, onNew }) {
+  async function copyLink(code) { await navigator.clipboard.writeText(`${window.location.origin}/?event=${code}`); alert('Registration link copied.') }
+  return <section className="events-section"><div className="section-title"><div><span className="eyebrow">Your events</span><h2>Event registration</h2></div><button className="button button-primary" onClick={onNew}><Plus size={17} /> Create event</button></div>{!events.length ? <div className="empty-state"><CalendarDays size={36} /><h3>No events yet</h3><p>Create your first event and share its player-registration link.</p></div> : <div className="event-grid">{events.map((item) => <article className="event-card" key={item.id}><div className="event-card-top"><span className={`status-badge ${item.status}`}>{item.status}</span><span className="event-code">{item.event_code}</span></div><h3>{item.name}</h3><p><CalendarDays size={15} /> {new Date(`${item.event_date}T00:00:00`).toLocaleDateString()}</p><p><MapPin size={15} /> {item.venue}{item.city ? `, ${item.city}` : ''}</p><div className="event-actions"><button className="button button-secondary" onClick={() => onSelect(item)}>View players</button><button className="icon-button" onClick={() => copyLink(item.event_code)} aria-label="Copy registration link"><Copy size={18} /></button></div></article>)}</div>}</section>
+}
 
-    try {
-      if (!isSupabaseConfigured) throw new Error('Supabase environment variables have not been configured.')
-
-      if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
-          email: form.email,
-          password: form.password,
-          options: {
-            data: {
-              full_name: form.full_name,
-              organization_name: form.organization_name,
-              phone: form.phone,
-              city: form.city,
-              country: form.country,
-            },
-          },
-        })
-        if (error) throw error
-        setMessage('Registration received. Please check your email to confirm your account.')
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: form.email,
-          password: form.password,
-        })
-        if (error) throw error
-      }
-    } catch (error) {
-      setMessage(error.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="modal-backdrop" role="presentation">
-      <section className="auth-card" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <button className="close-button" onClick={onClose} aria-label="Close">×</button>
-        <span className="eyebrow">{mode === 'signup' ? 'Organizer registration' : 'Welcome back'}</span>
-        <h2 id="auth-title">{mode === 'signup' ? 'Create your free account' : 'Sign in to PickleFlow'}</h2>
-        <p className="muted">No subscription or payment is required.</p>
-
-        <form onSubmit={submit}>
-          {mode === 'signup' && (
-            <>
-              <label>Full name<input required name="full_name" value={form.full_name} onChange={update} /></label>
-              <label>Club or organization<input required name="organization_name" value={form.organization_name} onChange={update} /></label>
-              <div className="form-row">
-                <label>City<input name="city" value={form.city} onChange={update} /></label>
-                <label>Country<input name="country" value={form.country} onChange={update} /></label>
-              </div>
-              <label>Phone number <span>(optional)</span><input name="phone" value={form.phone} onChange={update} /></label>
-            </>
-          )}
-          <label>Email<input required type="email" name="email" value={form.email} onChange={update} /></label>
-          <label>Password<input required minLength="8" type="password" name="password" value={form.password} onChange={update} /></label>
-          {message && <div className="form-message">{message}</div>}
-          <button className="button button-primary button-full" disabled={busy}>
-            {busy ? 'Please wait…' : mode === 'signup' ? 'Create free organizer account' : 'Sign in'}
-          </button>
-        </form>
-
-        <button className="text-button" onClick={() => { setMode(mode === 'signup' ? 'signin' : 'signup'); setMessage('') }}>
-          {mode === 'signup' ? 'Already registered? Sign in' : 'Need an account? Register'}
-        </button>
-      </section>
-    </div>
-  )
+function EventPlayers({ event, onBack }) {
+  const [players, setPlayers] = useState([]), [loading, setLoading] = useState(true)
+  useEffect(() => { supabase.from('player_registrations').select('*').eq('event_id', event.id).order('created_at').then(({ data }) => { setPlayers(data || []); setLoading(false) }) }, [event.id])
+  return <section className="profile-card"><div className="section-title"><div><span className="eyebrow">Event code {event.event_code}</span><h2>{event.name}</h2></div><button className="button button-secondary" onClick={onBack}>Back to events</button></div><p className="muted">{event.venue} · {new Date(`${event.event_date}T00:00:00`).toLocaleDateString()}</p>{loading ? <p>Loading players…</p> : !players.length ? <div className="empty-state small"><Users size={30} /><h3>No registered players yet</h3><p>Share the event link to begin accepting registrations.</p></div> : <div className="player-table-wrap"><table className="player-table"><thead><tr><th>Player</th><th>Skill level</th><th>Contact</th><th>Status</th></tr></thead><tbody>{players.map((player) => <tr key={player.id}><td><strong>{player.full_name}</strong></td><td className="capitalize">{player.skill_level}</td><td>{player.email}<br /><span>{player.phone}</span></td><td className="capitalize">{player.status}</td></tr>)}</tbody></table></div>}</section>
 }
 
 function Dashboard({ session }) {
-  const [profile, setProfile] = useState(emptyProfile)
-  const [saved, setSaved] = useState('')
-  const [busy, setBusy] = useState(true)
+  const [profile, setProfile] = useState(emptyProfile), [events, setEvents] = useState([]), [view, setView] = useState('events'), [selectedEvent, setSelectedEvent] = useState(null), [saved, setSaved] = useState(''), [loading, setLoading] = useState(true)
+  async function loadEvents() { const { data } = await supabase.from('events').select('*').eq('organizer_user_id', session.user.id).order('event_date', { ascending: false }); setEvents(data || []) }
+  useEffect(() => { Promise.all([supabase.from('organizer_profiles').select('full_name, organization_name, phone, city, country').eq('user_id', session.user.id).single(), supabase.from('events').select('*').eq('organizer_user_id', session.user.id).order('event_date', { ascending: false })]).then(([profileResult, eventResult]) => { if (profileResult.data) setProfile({ ...emptyProfile, ...profileResult.data }); setEvents(eventResult.data || []); setLoading(false) }) }, [session.user.id])
+  async function saveProfile(e) { e.preventDefault(); setSaved(''); const { error } = await supabase.from('organizer_profiles').update(profile).eq('user_id', session.user.id); setSaved(error ? error.message : 'Profile saved.') }
+  if (loading) return <main className="dashboard"><p>Loading PickleFlow…</p></main>
+  return <main className="dashboard"><section className="welcome-card"><span className="eyebrow"><ShieldCheck size={15} /> Organizer account</span><h1>Welcome{profile.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</h1><p>Create an event and share its link so players can register without creating an account.</p></section><nav className="dashboard-tabs"><button className={view !== 'profile' ? 'active' : ''} onClick={() => setView('events')}>Events</button><button className={view === 'profile' ? 'active' : ''} onClick={() => setView('profile')}>Organizer profile</button></nav>{view === 'events' && <EventList events={events} onSelect={(item) => { setSelectedEvent(item); setView('players') }} onNew={() => setView('new')} />}{view === 'new' && <EventForm defaultCity={profile.city} onCreated={(item) => { setEvents([item, ...events]); setView('events') }} onCancel={() => setView('events')} />}{view === 'players' && selectedEvent && <EventPlayers event={selectedEvent} onBack={() => { loadEvents(); setView('events') }} />}{view === 'profile' && <section className="profile-card"><h2>Organizer profile</h2><form onSubmit={saveProfile}><label>Full name<input required value={profile.full_name} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} /></label><label>Club or organization<input required value={profile.organization_name} onChange={(e) => setProfile({ ...profile, organization_name: e.target.value })} /></label><label>Phone number<input value={profile.phone || ''} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /></label><div className="form-row"><label>City<input value={profile.city || ''} onChange={(e) => setProfile({ ...profile, city: e.target.value })} /></label><label>Country<input value={profile.country || ''} onChange={(e) => setProfile({ ...profile, country: e.target.value })} /></label></div>{saved && <div className="form-message">{saved}</div>}<button className="button button-primary">Save profile</button></form></section>}</main>
+}
 
-  useEffect(() => {
-    async function loadProfile() {
-      const { data, error } = await supabase
-        .from('organizer_profiles')
-        .select('full_name, organization_name, phone, city, country')
-        .eq('user_id', session.user.id)
-        .single()
-
-      if (!error && data) setProfile({ ...emptyProfile, ...data })
-      setBusy(false)
-    }
-    loadProfile()
-  }, [session.user.id])
-
-  async function save(event) {
-    event.preventDefault()
-    setSaved('')
-    const { error } = await supabase
-      .from('organizer_profiles')
-      .update(profile)
-      .eq('user_id', session.user.id)
-
-    setSaved(error ? error.message : 'Profile saved.')
-  }
-
-  if (busy) return <main className="dashboard"><p>Loading your organizer profile…</p></main>
-
-  return (
-    <main className="dashboard">
-      <section className="welcome-card">
-        <span className="eyebrow"><ShieldCheck size={15} /> Organizer account</span>
-        <h1>Welcome{profile.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!</h1>
-        <p>Your PickleFlow account is active and free. Event creation and player registration are the next modules on the roadmap.</p>
-      </section>
-
-      <div className="dashboard-grid">
-        <section className="profile-card">
-          <h2>Organizer profile</h2>
-          <form onSubmit={save}>
-            <label>Full name<input required value={profile.full_name} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} /></label>
-            <label>Club or organization<input required value={profile.organization_name} onChange={(e) => setProfile({ ...profile, organization_name: e.target.value })} /></label>
-            <label>Phone number<input value={profile.phone || ''} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /></label>
-            <div className="form-row">
-              <label>City<input value={profile.city || ''} onChange={(e) => setProfile({ ...profile, city: e.target.value })} /></label>
-              <label>Country<input value={profile.country || ''} onChange={(e) => setProfile({ ...profile, country: e.target.value })} /></label>
-            </div>
-            {saved && <div className="form-message">{saved}</div>}
-            <button className="button button-primary">Save profile</button>
-          </form>
-        </section>
-
-        <aside className="next-card">
-          <h2>Coming next</h2>
-          <ol>
-            <li><strong>Create an event</strong><span>Set the date, venue, format, and player limit.</span></li>
-            <li><strong>Register players</strong><span>Share a link or add walk-in players.</span></li>
-            <li><strong>Run game day</strong><span>Manage courts, queues, scores, and standings.</span></li>
-          </ol>
-          <div className="mini-donation">
-            <Heart size={20} />
-            <div><strong>Want to help?</strong><span>Donations will remain completely optional.</span></div>
-          </div>
-        </aside>
-      </div>
-    </main>
-  )
+function PublicRegistration({ code, onHome }) {
+  const [event, setEvent] = useState(null), [count, setCount] = useState(0), [form, setForm] = useState(emptyPlayer), [message, setMessage] = useState(''), [success, setSuccess] = useState(false), [loading, setLoading] = useState(true)
+  useEffect(() => { supabase.from('events').select('*').eq('event_code', code.toUpperCase()).eq('status', 'open').single().then(async ({ data }) => { setEvent(data); if (data) { const result = await supabase.from('player_registrations').select('*', { count: 'exact', head: true }).eq('event_id', data.id); setCount(result.count || 0) } setLoading(false) }) }, [code])
+  const spots = useMemo(() => event?.registration_limit ? Math.max(event.registration_limit - count, 0) : null, [event, count])
+  async function submit(e) { e.preventDefault(); setMessage(''); if (spots === 0) return setMessage('Registration is full. Please contact the organizer.'); const { error } = await supabase.from('player_registrations').insert({ ...form, event_id: event.id }); if (error) setMessage(error.code === '23505' ? 'This email is already registered for the event.' : error.message); else setSuccess(true) }
+  if (loading) return <main className="public-registration"><p>Loading event…</p></main>
+  if (!event) return <main className="public-registration"><section className="auth-card"><h2>Event unavailable</h2><p className="muted">The event code is invalid, closed, or no longer accepting players.</p><button className="button button-primary" onClick={onHome}>Go to PickleFlow</button></section></main>
+  return <main className="public-registration"><section className="registration-hero"><span className="eyebrow">Player registration · {event.event_code}</span><h1>{event.name}</h1><p>{event.description || 'Join this pickleball event.'}</p><div className="event-meta"><span><CalendarDays size={17} /> {new Date(`${event.event_date}T00:00:00`).toLocaleDateString()} {event.start_time ? `· ${event.start_time.slice(0, 5)}` : ''}</span><span><MapPin size={17} /> {event.venue}{event.city ? `, ${event.city}` : ''}</span><span><Users size={17} /> {spots === null ? 'Open registration' : `${spots} spot${spots === 1 ? '' : 's'} remaining`}</span></div></section><section className="auth-card registration-card">{success ? <div className="registration-success"><CheckCircle2 size={54} /><h2>You’re registered!</h2><p>The organizer can now see your registration for {event.name}.</p></div> : <><h2>Player information</h2><p className="muted">You do not need a PickleFlow account.</p><form onSubmit={submit}><label>Full name<input required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></label><label>Email<input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label><label>Phone number <span>(optional)</span><input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label><label>Skill level<select value={form.skill_level} onChange={(e) => setForm({ ...form, skill_level: e.target.value })}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option><option value="competitive">Competitive</option></select></label>{message && <div className="form-message error">{message}</div>}<button className="button button-primary button-full">Register for this event</button></form></>}</section></main>
 }
 
 export default function App() {
-  const [session, setSession] = useState(null)
-  const [showAuth, setShowAuth] = useState(false)
-  const [loading, setLoading] = useState(isSupabaseConfigured)
-
-  useEffect(() => {
-    if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession)
-      if (nextSession) setShowAuth(false)
-    })
-    return () => listener.subscription.unsubscribe()
-  }, [])
-
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
-  return (
-    <div className="app">
-      <Header session={session} onSignOut={signOut} />
-      {loading ? <main className="dashboard"><p>Loading PickleFlow…</p></main> : session ? <Dashboard session={session} /> : <Landing onStart={() => setShowAuth(true)} />}
-      {!session && showAuth && <AuthPanel onClose={() => setShowAuth(false)} />}
-    </div>
-  )
+  const [session, setSession] = useState(null), [showAuth, setShowAuth] = useState(false), [loading, setLoading] = useState(isSupabaseConfigured)
+  const eventCode = new URLSearchParams(window.location.search).get('event')
+  useEffect(() => { if (!supabase) return; supabase.auth.getSession().then(({ data }) => { setSession(data.session); setLoading(false) }); const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => { setSession(nextSession); if (nextSession) setShowAuth(false) }); return () => listener.subscription.unsubscribe() }, [])
+  if (eventCode && supabase) return <div className="app"><Header /><PublicRegistration code={eventCode} onHome={() => { window.location.href = '/' }} /></div>
+  return <div className="app"><Header session={session} onSignOut={() => supabase.auth.signOut()} />{loading ? <main className="dashboard"><p>Loading PickleFlow…</p></main> : session ? <Dashboard session={session} /> : <Landing onStart={() => setShowAuth(true)} />}{!session && showAuth && <AuthPanel onClose={() => setShowAuth(false)} />}</div>
 }
