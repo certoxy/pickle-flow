@@ -1,0 +1,14 @@
+{
+  "name": "PickleFlow",
+  "short_name": "PickleFlow",
+  "description": "Run pickleball events, manage players, queues, matches, and results.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f9fc",
+  "theme_color": "#123b66",
+  "icons": [
+    { "src": "/brand/pickleflow-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/pickleflow-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
