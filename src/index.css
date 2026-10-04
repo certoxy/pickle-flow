@@ -166,6 +166,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); box-shado
 .game-day-main { grid-template-columns: .85fr 1.15fr; }
 .game-day-page .profile-card h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 17px; color: var(--navy); }
 .game-day-page .subheading { margin-top: 24px !important; }
+.open-play-note { display: grid; gap: 4px; margin-top: 14px; padding: 13px; border-radius: 11px; color: #41630a; background: #eef9d8; }
+.open-play-note span { color: #587332; font-size: .77rem; line-height: 1.45; }
 .court-form { grid-template-columns: 1fr auto; margin: 0; }
 .court-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .court-chip { display: grid; gap: 2px; padding: 10px 13px; border: 1px solid var(--border); border-radius: 11px; color: var(--navy); background: white; cursor: pointer; text-align: left; font-weight: 800; }
