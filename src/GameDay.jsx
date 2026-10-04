@@ -17,6 +17,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [autoAssigning, setAutoAssigning] = useState(false)
+  const [completionPrompt, setCompletionPrompt] = useState(null)
+  const [completingGame, setCompletingGame] = useState(false)
   const teamSize = event.game_format === 'singles' ? 1 : 2
   const playersNeeded = teamSize * 2
 
@@ -138,12 +140,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   async function completeGame(game, scoreOverride) {
     const score = scoreOverride || scores[game.id] || { one: 0, two: 0 }
     const one = Number(score.one), two = Number(score.two)
-    if (Math.max(one, two) < game.points_to_win) return setMessage(`A result cannot be recorded until one team reaches ${game.points_to_win} points.`)
-    if (one === two) return setMessage('The game cannot finish with a tied score.')
+    if (Math.max(one, two) < game.points_to_win) { setMessage(`A result cannot be recorded until one team reaches ${game.points_to_win} points.`); return false }
+    if (one === two) { setMessage('The game cannot finish with a tied score.'); return false }
     const winner_team = one > two ? 1 : 2
     const completed_at = new Date().toISOString()
     const { error } = await supabase.from('games').update({ status: 'completed', team_one_score: one, team_two_score: two, winner_team, completed_at }).eq('id', game.id)
-    if (error) return setMessage(error.message)
+    if (error) { setMessage(error.message); return false }
     await supabase.from('event_courts').update({ status: 'available' }).eq('id', game.court_id)
     if (game.format === 'open_play') {
       const participantIds = gamePlayers.filter((entry) => entry.game_id === game.id).map((entry) => entry.player_registration_id)
@@ -155,21 +157,30 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setGames(games.map((item) => item.id === game.id ? { ...item, status: 'completed', team_one_score: one, team_two_score: two, winner_team, completed_at } : item))
     setCourts(courts.map((court) => court.id === game.court_id ? { ...court, status: 'available' } : court))
     setMessage(game.format === 'open_play' ? `Game ${game.game_number} recorded. All four players returned to the back of the queue.` : `Game ${game.game_number} recorded. Players can be added back to the queue.`)
+    return true
+  }
+
+  async function confirmGameCompletion() {
+    if (!completionPrompt || completingGame) return
+    setCompletingGame(true)
+    const completed = await completeGame(completionPrompt.game, completionPrompt.score)
+    setCompletingGame(false)
+    if (completed) setCompletionPrompt(null)
   }
 
   function changeLiveScore(game, team, change) {
     const current = scores[game.id] || { one: 0, two: 0 }
     const key = team === 1 ? 'one' : 'two'
-    const opponentKey = team === 1 ? 'two' : 'one'
     const next = { ...current, [key]: Math.max(0, Number(current[key] || 0) + change) }
     setScores({ ...scores, [game.id]: next })
-    if (next[key] >= game.points_to_win && next[key] > Number(next[opponentKey] || 0)) completeGame(game, next)
+    const one = Number(next.one || 0), two = Number(next.two || 0)
+    if (Math.max(one, two) >= game.points_to_win && one !== two) setCompletionPrompt({ game, score: next })
   }
 
   function participants(game, team) { return gamePlayers.filter((entry) => entry.game_id === game.id && entry.team_number === team).map((entry) => playerName(players, entry.player_registration_id)).join(' & ') }
 
   if (loading) return <section className="profile-card"><p>Loading game day…</p></section>
-  return <section className="game-day-page"><div className="section-title"><div><span className="eyebrow"><Swords size={15} /> Game-day management</span><h2>{event.name}</h2></div><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
+  return <section className="game-day-page">{completionPrompt && <div className="modal-backdrop"><section className="game-complete-dialog" role="dialog" aria-modal="true" aria-labelledby="complete-game-title"><span className="dialog-icon"><Trophy size={25} /></span><span className="eyebrow">Points to win reached</span><h2 id="complete-game-title">Complete Game {completionPrompt.game.game_number}?</h2><p className="muted">Please confirm the final score before closing the game.</p><div className="completion-score"><div><span>Team 1</span><strong>{completionPrompt.score.one}</strong><small>{participants(completionPrompt.game, 1)}</small></div><b>–</b><div><span>Team 2</span><strong>{completionPrompt.score.two}</strong><small>{participants(completionPrompt.game, 2)}</small></div></div><p className="completion-winner"><Trophy size={17} /> Team {Number(completionPrompt.score.one) > Number(completionPrompt.score.two) ? '1' : '2'} will be recorded as the winner.</p><div className="dialog-actions"><button className="button button-secondary" onClick={() => setCompletionPrompt(null)} disabled={completingGame}>Keep playing</button><button className="button button-primary" onClick={confirmGameCompletion} disabled={completingGame}><Check size={17} /> {completingGame ? 'Completing…' : 'Confirm result'}</button></div></section></div>}<div className="section-title"><div><span className="eyebrow"><Swords size={15} /> Game-day management</span><h2>{event.name}</h2></div><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
     {message && <div className="form-message game-message">{message}</div>}
     <div className="game-day-summary"><div><strong>{checkedIn.length}</strong><span>Checked in</span></div><div><strong>{waiting.length}</strong><span>Waiting</span></div><div><strong>{activeGames.length}</strong><span>Active games</span></div><div><strong>{completedGames.length}</strong><span>Completed</span></div></div>
     <div className="game-day-grid">
