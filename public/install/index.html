@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#123b66" />
+    <meta name="description" content="Install PickleFlow on your phone." />
+    <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <title>Install PickleFlow</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-width: 320px; min-height: 100vh; padding: 24px; display: grid; place-items: center; color: #17324d; background: radial-gradient(circle at 12% 10%, rgba(169,231,47,.22), transparent 22rem), radial-gradient(circle at 88% 18%, rgba(35,117,216,.16), transparent 26rem), #f5f9fc; font-family: Manrope, system-ui, sans-serif; }
+      .install-card { width: min(100%, 520px); padding: 34px; border: 1px solid #dce7ef; border-radius: 26px; background: rgba(255,255,255,.94); box-shadow: 0 24px 70px rgba(18,59,102,.16); text-align: center; }
+      .app-icon { width: 112px; height: 112px; margin-bottom: 16px; border-radius: 25px; box-shadow: 0 14px 30px rgba(18,59,102,.18); }
+      .eyebrow { color: #4c7110; font-size: .75rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+      h1 { margin: 9px 0 10px; color: #123b66; font-size: clamp(2rem, 8vw, 3rem); letter-spacing: -.045em; }
+      p { margin: 0; color: #63778a; line-height: 1.65; }
+      .actions { display: grid; gap: 10px; margin-top: 26px; }
+      .button { min-height: 50px; padding: 14px 18px; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 13px; cursor: pointer; font: inherit; font-weight: 800; text-decoration: none; }
+      .primary { color: #fff; background: #2375d8; box-shadow: 0 10px 24px rgba(35,117,216,.25); }
+      .secondary { color: #123b66; background: #fff; border: 1px solid #dce7ef; }
+      .instructions { display: none; margin-top: 20px; padding: 16px; border-radius: 14px; color: #123b66; background: #eef6ff; text-align: left; line-height: 1.55; }
+      .instructions.show { display: block; }
+      .note { margin-top: 17px; font-size: .78rem; }
+      @media (max-width: 520px) { body { padding: 14px; } .install-card { padding: 28px 20px; border-radius: 22px; } }
+    </style>
+  </head>
+  <body>
+    <main class="install-card">
+      <img class="app-icon" src="/brand/pickleflow-icon-192.png" alt="PickleFlow app icon" />
+      <div class="eyebrow">Pickleball event management</div>
+      <h1>Install PickleFlow</h1>
+      <p>Add PickleFlow to your phone for quick, full-screen access on game day.</p>
+      <div class="actions">
+        <button class="button primary" id="install-button">Install PickleFlow</button>
+        <a class="button secondary" href="/">Open web app</a>
+      </div>
+      <div class="instructions" id="instructions"></div>
+      <p class="note">No App Store account or download fee is required.</p>
+    </main>
+    <script>
+      let installPrompt
+      const button = document.getElementById('install-button')
+      const instructions = document.getElementById('instructions')
+      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+
+      window.addEventListener('beforeinstallprompt', (event) => {
+        event.preventDefault()
+        installPrompt = event
+      })
+
+      button.addEventListener('click', async () => {
+        if (installPrompt) {
+          installPrompt.prompt()
+          await installPrompt.userChoice
+          installPrompt = null
+          return
+        }
+        instructions.classList.add('show')
+        instructions.innerHTML = isIos
+          ? '<strong>On iPhone or iPad:</strong><br>1. Tap the Share button in Safari.<br>2. Choose <strong>Add to Home Screen</strong>.<br>3. Tap <strong>Add</strong>.'
+          : '<strong>Install from your browser:</strong><br>Open the browser menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.'
+      })
+
+      if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js'))
+    </script>
+  </body>
+</html>
