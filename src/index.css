@@ -47,6 +47,8 @@ main { max-width: 1180px; margin: auto; padding: 40px 24px 80px; }
 .button-danger { color: #9a3028; background: #fff0ed; border: 1px solid #f4c6c0; }
 .button-full { width: 100%; margin-top: 8px; }
 .button:disabled { opacity: .65; cursor: wait; transform: none; }
+.button.requires-reopen { opacity: .62; cursor: help; box-shadow: none; }
+.button.requires-reopen:hover { opacity: .82; transform: none; }
 
 .court-card { aspect-ratio: .95; max-height: 500px; position: relative; overflow: hidden; border: 12px solid white; border-radius: 34px; background:
   linear-gradient(90deg, transparent 49.5%, white 49.5%, white 50.5%, transparent 50.5%),
