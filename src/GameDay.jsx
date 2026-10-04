@@ -16,6 +16,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [scores, setScores] = useState({})
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [autoAssigning, setAutoAssigning] = useState(false)
   const teamSize = event.game_format === 'singles' ? 1 : 2
   const playersNeeded = teamSize * 2
 
@@ -49,6 +50,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     const wins = appearances.filter((entry) => completedGames.find((game) => game.id === entry.game_id)?.winner_team === entry.team_number).length
     return { ...player, played: appearances.length, wins, losses: appearances.length - wins }
   }).sort((a, b) => b.wins - a.wins || a.losses - b.losses || a.full_name.localeCompare(b.full_name)), [checkedIn, completedGames, gamePlayers])
+
+  useEffect(() => {
+    if (!event.auto_assign_next_players || autoAssigning) return
+    const court = courts.find((item) => item.status === 'available')
+    if (!court || waiting.length < playersNeeded) return
+    setAutoAssigning(true)
+    createMatchFor(waiting.slice(0, playersNeeded).map((entry) => entry.player_registration_id), court.id, true).finally(() => setAutoAssigning(false))
+  }, [event.auto_assign_next_players, courts, queue, playersNeeded, autoAssigning])
 
   async function updateEventSettings(field, value) {
     const payload = { [field]: field === 'points_to_win' ? Number(value) : value }
@@ -97,25 +106,29 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setSelectedPlayers(waiting.slice(0, playersNeeded).map((entry) => entry.player_registration_id))
   }
 
-  async function createMatch() {
+  async function createMatchFor(playerIds, courtId, automatic = false) {
     setMessage('')
-    if (!selectedCourt) return setMessage('Select an available court.')
-    if (selectedPlayers.length !== playersNeeded) return setMessage(`Select exactly ${playersNeeded} players.`)
+    if (!courtId) { setMessage('Select an available court.'); return false }
+    if (playerIds.length !== playersNeeded) { setMessage(`Select exactly ${playersNeeded} players.`); return false }
     const gameNumber = games.length ? Math.max(...games.map((game) => game.game_number)) + 1 : 1
-    const { data: game, error } = await supabase.from('games').insert({ event_id: event.id, court_id: selectedCourt, game_number: gameNumber, format: event.game_format, points_to_win: event.points_to_win }).select().single()
-    if (error) return setMessage(error.message)
-    const participants = selectedPlayers.map((playerId, index) => ({ game_id: game.id, player_registration_id: playerId, team_number: index < teamSize ? 1 : 2 }))
+    const { data: game, error } = await supabase.from('games').insert({ event_id: event.id, court_id: courtId, game_number: gameNumber, format: event.game_format, points_to_win: event.points_to_win }).select().single()
+    if (error) { setMessage(error.message); return false }
+    const participants = playerIds.map((playerId, index) => ({ game_id: game.id, player_registration_id: playerId, team_number: index < teamSize ? 1 : 2 }))
     const { data: inserted, error: playerError } = await supabase.from('game_players').insert(participants).select()
-    if (playerError) return setMessage(playerError.message)
+    if (playerError) { setMessage(playerError.message); return false }
     await Promise.all([
-      supabase.from('event_courts').update({ status: 'in_use' }).eq('id', selectedCourt),
-      supabase.from('game_queue').update({ status: 'assigned' }).eq('event_id', event.id).in('player_registration_id', selectedPlayers)
+      supabase.from('event_courts').update({ status: 'in_use' }).eq('id', courtId),
+      supabase.from('game_queue').update({ status: 'assigned' }).eq('event_id', event.id).in('player_registration_id', playerIds)
     ])
     setGames([game, ...games]); setGamePlayers([...gamePlayers, ...(inserted || [])])
-    setCourts(courts.map((court) => court.id === selectedCourt ? { ...court, status: 'in_use' } : court))
-    setQueue(queue.map((entry) => selectedPlayers.includes(entry.player_registration_id) ? { ...entry, status: 'assigned' } : entry))
+    setCourts(courts.map((court) => court.id === courtId ? { ...court, status: 'in_use' } : court))
+    setQueue(queue.map((entry) => playerIds.includes(entry.player_registration_id) ? { ...entry, status: 'assigned' } : entry))
     setSelectedPlayers([]); setSelectedCourt('')
+    if (automatic) setMessage(`Game ${gameNumber} automatically assigned and ready to start.`)
+    return true
   }
+
+  async function createMatch() { await createMatchFor(selectedPlayers, selectedCourt) }
 
   async function startGame(game) {
     const { error } = await supabase.from('games').update({ status: 'playing', started_at: new Date().toISOString() }).eq('id', game.id)
@@ -160,7 +173,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     {message && <div className="form-message game-message">{message}</div>}
     <div className="game-day-summary"><div><strong>{checkedIn.length}</strong><span>Checked in</span></div><div><strong>{waiting.length}</strong><span>Waiting</span></div><div><strong>{activeGames.length}</strong><span>Active games</span></div><div><strong>{completedGames.length}</strong><span>Completed</span></div></div>
     <div className="game-day-grid">
-      <section className="profile-card"><h3>Game settings</h3><div className="form-row"><label>Format<select value={event.game_format || 'doubles'} onChange={(e) => updateEventSettings('game_format', e.target.value)}><option value="open_play">Open Play</option><option value="singles">Singles</option><option value="doubles">Doubles</option><option value="mixed_doubles">Mixed doubles</option></select></label><label>Points to win<input type="number" min="1" max="99" value={event.points_to_win || 11} onChange={(e) => updateEventSettings('points_to_win', e.target.value)} /></label></div>{event.game_format === 'open_play' && <div className="open-play-note"><strong>Four on, four off</strong><span>The next four waiting players take the court. After the result, all four return to the back of the queue.</span></div>}<h3 className="subheading">Courts</h3><form className="court-form" onSubmit={addCourt}><input required placeholder="Court name or number" value={courtName} onChange={(e) => setCourtName(e.target.value)} /><button className="button button-primary"><Plus size={16} /> Add</button></form><div className="court-list">{courts.map((court) => <button key={court.id} className={`court-chip ${court.status}`} disabled={court.status === 'in_use'} onClick={() => toggleCourt(court)}>{court.name}<span>{court.status.replace('_', ' ')}</span></button>)}{!courts.length && <p className="muted">Add at least one court to create matches.</p>}</div></section>
+      <section className="profile-card"><h3>Game settings</h3><div className="form-row"><label>Format<select value={event.game_format || 'doubles'} onChange={(e) => updateEventSettings('game_format', e.target.value)}><option value="open_play">Open Play</option><option value="singles">Singles</option><option value="doubles">Doubles</option><option value="mixed_doubles">Mixed doubles</option></select></label><label>Points to win<input type="number" min="1" max="99" value={event.points_to_win || 11} onChange={(e) => updateEventSettings('points_to_win', e.target.value)} /></label></div><label className="auto-assign-toggle"><input type="checkbox" checked={Boolean(event.auto_assign_next_players)} onChange={(e) => updateEventSettings('auto_assign_next_players', e.target.checked)} /><span><strong>Auto-assign next players</strong><small>Automatically create the next match when enough players and a court are available.</small></span></label>{event.game_format === 'open_play' && <div className="open-play-note"><strong>Four on, four off</strong><span>The next four waiting players take the court. After the result, all four return to the back of the queue.</span></div>}<h3 className="subheading">Courts</h3><form className="court-form" onSubmit={addCourt}><input required placeholder="Court name or number" value={courtName} onChange={(e) => setCourtName(e.target.value)} /><button className="button button-primary"><Plus size={16} /> Add</button></form><div className="court-list">{courts.map((court) => <button key={court.id} className={`court-chip ${court.status}`} disabled={court.status === 'in_use'} onClick={() => toggleCourt(court)}>{court.name}<span>{court.status.replace('_', ' ')}</span></button>)}{!courts.length && <p className="muted">Add at least one court to create matches.</p>}</div></section>
       <section className="profile-card"><h3><UserCheck size={19} /> Player check-in</h3><div className="checkin-list">{players.map((player) => { const queued = queue.find((entry) => entry.player_registration_id === player.id)?.status === 'waiting'; return <div className="checkin-row" key={player.id}><div><strong>{player.full_name}</strong><span className="capitalize">{player.skill_level}</span></div><div className="checkin-actions"><button className={`small-action ${player.checked_in_at ? 'checked' : ''}`} onClick={() => toggleCheckIn(player)}>{player.checked_in_at ? <><Check size={15} /> Present</> : 'Check in'}</button>{player.checked_in_at && <button className="small-action" onClick={() => queued ? removeFromQueue(player.id) : addToQueue(player.id)}>{queued ? 'Leave queue' : 'Join queue'}</button>}</div></div>})}</div></section>
     </div>
     <div className="game-day-grid game-day-main">

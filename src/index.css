@@ -168,6 +168,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); box-shado
 .game-day-page .subheading { margin-top: 24px !important; }
 .open-play-note { display: grid; gap: 4px; margin-top: 14px; padding: 13px; border-radius: 11px; color: #41630a; background: #eef9d8; }
 .open-play-note span { color: #587332; font-size: .77rem; line-height: 1.45; }
+.auto-assign-toggle { display: flex; align-items: flex-start; gap: 11px; margin-top: 15px; padding: 13px; border: 1px solid var(--border); border-radius: 11px; background: #f8fbfd; cursor: pointer; }
+.auto-assign-toggle input { width: 19px; height: 19px; margin: 2px 0 0; accent-color: var(--blue); }
+.auto-assign-toggle span, .auto-assign-toggle strong, .auto-assign-toggle small { display: block; }
+.auto-assign-toggle strong { color: var(--navy); }
+.auto-assign-toggle small { margin-top: 3px; color: var(--muted); line-height: 1.4; }
 .court-form { grid-template-columns: 1fr auto; margin: 0; }
 .court-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .court-chip { display: grid; gap: 2px; padding: 10px 13px; border: 1px solid var(--border); border-radius: 11px; color: var(--navy); background: white; cursor: pointer; text-align: left; font-weight: 800; }
