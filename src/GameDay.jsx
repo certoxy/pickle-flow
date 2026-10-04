@@ -122,10 +122,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     if (error) setMessage(error.message); else setGames(games.map((item) => item.id === game.id ? { ...item, status: 'playing', started_at: new Date().toISOString() } : item))
   }
 
-  async function completeGame(game) {
-    const score = scores[game.id] || { one: '', two: '' }
+  async function completeGame(game, scoreOverride) {
+    const score = scoreOverride || scores[game.id] || { one: 0, two: 0 }
     const one = Number(score.one), two = Number(score.two)
-    if (score.one === '' || score.two === '' || one === two) return setMessage('Enter two different final scores.')
+    if (Math.max(one, two) < game.points_to_win) return setMessage(`A result cannot be recorded until one team reaches ${game.points_to_win} points.`)
+    if (one === two) return setMessage('The game cannot finish with a tied score.')
     const winner_team = one > two ? 1 : 2
     const completed_at = new Date().toISOString()
     const { error } = await supabase.from('games').update({ status: 'completed', team_one_score: one, team_two_score: two, winner_team, completed_at }).eq('id', game.id)
@@ -143,6 +144,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setMessage(game.format === 'open_play' ? `Game ${game.game_number} recorded. All four players returned to the back of the queue.` : `Game ${game.game_number} recorded. Players can be added back to the queue.`)
   }
 
+  function changeLiveScore(game, team, change) {
+    const current = scores[game.id] || { one: 0, two: 0 }
+    const key = team === 1 ? 'one' : 'two'
+    const opponentKey = team === 1 ? 'two' : 'one'
+    const next = { ...current, [key]: Math.max(0, Number(current[key] || 0) + change) }
+    setScores({ ...scores, [game.id]: next })
+    if (next[key] >= game.points_to_win && next[key] > Number(next[opponentKey] || 0)) completeGame(game, next)
+  }
+
   function participants(game, team) { return gamePlayers.filter((entry) => entry.game_id === game.id && entry.team_number === team).map((entry) => playerName(players, entry.player_registration_id)).join(' & ') }
 
   if (loading) return <section className="profile-card"><p>Loading game day…</p></section>
@@ -155,7 +165,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     </div>
     <div className="game-day-grid game-day-main">
       <section className="profile-card"><h3><Clock3 size={19} /> Waiting queue</h3>{!waiting.length ? <p className="muted">Checked-in players can be added to the queue.</p> : <div className="queue-list">{waiting.map((entry, index) => <label className={`queue-row ${selectedPlayers.includes(entry.player_registration_id) ? 'selected' : ''}`} key={entry.id}><input type="checkbox" checked={selectedPlayers.includes(entry.player_registration_id)} onChange={() => toggleSelected(entry.player_registration_id)} /><span className="queue-number">{index + 1}</span><div><strong>{playerName(players, entry.player_registration_id)}</strong><span>Waiting {Math.max(0, Math.floor((Date.now() - new Date(entry.joined_at)) / 60000))} min</span></div><button type="button" onClick={(e) => { e.preventDefault(); removeFromQueue(entry.player_registration_id) }}><X size={15} /></button></label>)}</div>}<div className="match-builder">{event.game_format === 'open_play' && <button className="button button-secondary" onClick={selectNextPlayers} disabled={waiting.length < 4}>Select next four players</button>}<select value={selectedCourt} onChange={(e) => setSelectedCourt(e.target.value)}><option value="">Select available court</option>{courts.filter((court) => court.status === 'available').map((court) => <option key={court.id} value={court.id}>{court.name}</option>)}</select><button className="button button-primary" onClick={createMatch} disabled={selectedPlayers.length !== playersNeeded}><Swords size={16} /> Create match ({selectedPlayers.length}/{playersNeeded})</button><small>{event.game_format === 'open_play' ? 'Queue order assigns the first two to Team 1 and the next two to Team 2.' : 'Selection order assigns Team 1, then Team 2.'}</small></div></section>
-      <section className="profile-card"><h3><Play size={19} /> Matches</h3><div className="match-list">{activeGames.map((game) => <article className={`match-card ${game.status}`} key={game.id}><div className="match-card-title"><strong>Game {game.game_number} · {courts.find((court) => court.id === game.court_id)?.name || 'Court'}</strong><span className={`status-badge ${game.status}`}>{game.status}</span></div><div className="teams"><div><span>Team 1</span><strong>{participants(game, 1)}</strong></div><span>vs</span><div><span>Team 2</span><strong>{participants(game, 2)}</strong></div></div>{game.status === 'queued' ? <button className="button button-primary button-full" onClick={() => startGame(game)}><Play size={16} /> Start game</button> : <div className="score-entry"><input type="number" min="0" placeholder="Team 1" value={scores[game.id]?.one || ''} onChange={(e) => setScores({ ...scores, [game.id]: { ...scores[game.id], one: e.target.value } })} /><span>–</span><input type="number" min="0" placeholder="Team 2" value={scores[game.id]?.two || ''} onChange={(e) => setScores({ ...scores, [game.id]: { ...scores[game.id], two: e.target.value } })} /><button className="button button-primary" onClick={() => completeGame(game)}>Record result</button></div>}</article>)}{!activeGames.length && <p className="muted">No queued or active matches.</p>}</div></section>
+      <section className="profile-card"><h3><Play size={19} /> Matches</h3><div className="match-list">{activeGames.map((game) => <article className={`match-card ${game.status}`} key={game.id}><div className="match-card-title"><strong>Game {game.game_number} · {courts.find((court) => court.id === game.court_id)?.name || 'Court'}</strong><span className={`status-badge ${game.status}`}>{game.status}</span></div><div className="teams"><div><span>Team 1</span><strong>{participants(game, 1)}</strong></div><span>vs</span><div><span>Team 2</span><strong>{participants(game, 2)}</strong></div></div>{game.status === 'queued' ? <button className="button button-primary button-full" onClick={() => startGame(game)}><Play size={16} /> Start game</button> : <div className="live-score"><div><span>Team 1</span><div className="score-control"><button onClick={() => changeLiveScore(game, 1, -1)} aria-label="Subtract Team 1 point">−</button><strong>{scores[game.id]?.one || 0}</strong><button onClick={() => changeLiveScore(game, 1, 1)} aria-label="Add Team 1 point">+</button></div></div><b>First to {game.points_to_win}</b><div><span>Team 2</span><div className="score-control"><button onClick={() => changeLiveScore(game, 2, -1)} aria-label="Subtract Team 2 point">−</button><strong>{scores[game.id]?.two || 0}</strong><button onClick={() => changeLiveScore(game, 2, 1)} aria-label="Add Team 2 point">+</button></div></div></div>}</article>)}{!activeGames.length && <p className="muted">No queued or active matches.</p>}</div></section>
     </div>
     <div className="game-day-grid">
       <section className="profile-card"><h3><Trophy size={19} /> Event standings</h3><div className="player-table-wrap"><table className="player-table"><thead><tr><th>Rank</th><th>Player</th><th>Played</th><th>Wins</th><th>Losses</th></tr></thead><tbody>{standings.map((player, index) => <tr key={player.id}><td>{index + 1}</td><td><strong>{player.full_name}</strong></td><td>{player.played}</td><td>{player.wins}</td><td>{player.losses}</td></tr>)}</tbody></table></div></section>
