@@ -29,8 +29,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 }
 
 .topbar { max-width: 1180px; margin: auto; height: 76px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; }
-.brand { display: flex; align-items: center; gap: 10px; color: var(--navy); text-decoration: none; font-weight: 800; font-size: 1.18rem; }
-.brand-mark { width: 36px; height: 36px; display: grid; place-items: center; color: var(--navy); background: var(--green); border-radius: 12px; transform: rotate(-5deg); }
+.brand { display: flex; align-items: center; color: var(--navy); text-decoration: none; }
+.brand img { display: block; width: 174px; height: 56px; object-fit: contain; object-position: left center; }
 
 main { max-width: 1180px; margin: auto; padding: 40px 24px 80px; }
 .hero { min-height: 570px; display: grid; grid-template-columns: 1.05fr .95fr; gap: 64px; align-items: center; }
@@ -252,6 +252,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); box-shado
 @media (max-width: 520px) {
   main { padding-left: 16px; padding-right: 16px; }
   .topbar { padding: 0 16px; }
+  .brand img { width: 145px; height: 48px; }
   .hero-copy h1 { font-size: 2.65rem; }
   .feature-grid { padding-bottom: 50px; }
   .form-row { grid-template-columns: 1fr; }

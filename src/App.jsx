@@ -11,7 +11,7 @@ const formatDate = (date) => new Date(`${date}T00:00:00`).toLocaleDateString()
 const addDays = (date, days) => { const value = new Date(`${date}T00:00:00`); value.setDate(value.getDate() + days); return value.toISOString().slice(0, 10) }
 
 function Header({ session, onSignOut }) {
-  return <header className="topbar"><a className="brand" href="/"><span className="brand-mark">P</span><span>PickleFlow</span></a>{session && <button className="button button-ghost" onClick={onSignOut}><LogOut size={17} /> Sign out</button>}</header>
+  return <header className="topbar"><a className="brand" href="/" aria-label="PickleFlow home"><img src="/brand/pickleflow-logo.png" alt="PickleFlow" /></a>{session && <button className="button button-ghost" onClick={onSignOut}><LogOut size={17} /> Sign out</button>}</header>
 }
 
 function Landing({ onStart }) {
