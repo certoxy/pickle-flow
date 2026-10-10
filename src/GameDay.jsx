@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -36,6 +36,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [substitutionPrompt, setSubstitutionPrompt] = useState(null);
   const [substitutePlayerId, setSubstitutePlayerId] = useState("");
   const [substituting, setSubstituting] = useState(false);
+  const scoreSaveChains = useRef({});
   const teamSize = event.game_format === "singles" ? 1 : 2;
   const playersNeeded = teamSize * 2;
 
@@ -76,6 +77,17 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setQueue(queueResult.data || []);
     setGames(loadedGames);
     setGamePlayers(participantResult.data || []);
+    setScores(
+      Object.fromEntries(
+        loadedGames.map((game) => [
+          game.id,
+          {
+            one: Number(game.team_one_score || 0),
+            two: Number(game.team_two_score || 0),
+          },
+        ]),
+      ),
+    );
     setLoading(false);
   }
 
@@ -567,17 +579,32 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   function changeLiveScore(game, team, change) {
-    const current = scores[game.id] || { one: 0, two: 0 };
     const key = team === 1 ? "one" : "two";
-    const next = {
-      ...current,
-      [key]: Math.max(0, Number(current[key] || 0) + change),
-    };
-    setScores({ ...scores, [game.id]: next });
-    const one = Number(next.one || 0),
-      two = Number(next.two || 0);
-    if (Math.max(one, two) >= game.points_to_win && one !== two)
-      setCompletionPrompt({ game, score: next });
+    setScores((currentScores) => {
+      const current = currentScores[game.id] || { one: 0, two: 0 };
+      const next = {
+        ...current,
+        [key]: Math.max(0, Number(current[key] || 0) + change),
+      };
+      const saveScore = async () => {
+        const { error } = await supabase
+          .from("games")
+          .update({
+            team_one_score: Number(next.one || 0),
+            team_two_score: Number(next.two || 0),
+          })
+          .eq("id", game.id);
+        if (error) setMessage(`Score could not be saved: ${error.message}`);
+      };
+      scoreSaveChains.current[game.id] = (
+        scoreSaveChains.current[game.id] || Promise.resolve()
+      ).then(saveScore);
+      const one = Number(next.one || 0),
+        two = Number(next.two || 0);
+      if (Math.max(one, two) >= game.points_to_win && one !== two)
+        setCompletionPrompt({ game, score: next });
+      return { ...currentScores, [game.id]: next };
+    });
   }
 
   function participants(game, team) {
@@ -818,16 +845,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               onChange={(e) => setSelectedCourt(e.target.value)}
             >
               <option value="">Select court slot</option>
-              {courts
-                .filter(courtCanAcceptMatch)
-                .map((court) => (
-                  <option key={court.id} value={court.id}>
-                    {court.name}
-                    {playingGameForCourt(court.id)
-                      ? " · Next match"
-                      : " · Play now"}
-                  </option>
-                ))}
+              {courts.filter(courtCanAcceptMatch).map((court) => (
+                <option key={court.id} value={court.id}>
+                  {court.name}
+                  {playingGameForCourt(court.id)
+                    ? " · Next match"
+                    : " · Play now"}
+                </option>
+              ))}
             </select>
             <button
               className="button button-primary"

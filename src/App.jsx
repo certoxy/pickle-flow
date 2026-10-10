@@ -1106,6 +1106,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
 }
 
 function Dashboard({ session }) {
+  const dashboardStateKey = `pickleflow-dashboard-${session.user.id}`;
   const [profile, setProfile] = useState(emptyProfile),
     [events, setEvents] = useState([]),
     [view, setView] = useState("events"),
@@ -1134,12 +1135,41 @@ function Dashboard({ session }) {
         .eq("organizer_user_id", session.user.id)
         .order("event_date", { ascending: false }),
     ]).then(([profileResult, eventResult]) => {
+      const loadedEvents = eventResult.data || [];
       if (profileResult.data)
         setProfile({ ...emptyProfile, ...profileResult.data });
-      setEvents(eventResult.data || []);
+      setEvents(loadedEvents);
+      try {
+        const savedState = JSON.parse(
+          window.localStorage.getItem(dashboardStateKey) || "null",
+        );
+        const savedEvent = loadedEvents.find(
+          (event) => event.id === savedState?.eventId,
+        );
+        if (
+          savedEvent &&
+          ["players", "edit", "game-day"].includes(savedState?.view)
+        ) {
+          setSelectedEvent(savedEvent);
+          setView(savedState.view);
+        }
+      } catch {
+        window.localStorage.removeItem(dashboardStateKey);
+      }
       setLoading(false);
     });
   }, [session.user.id]);
+  useEffect(() => {
+    if (loading) return;
+    if (selectedEvent && ["players", "edit", "game-day"].includes(view)) {
+      window.localStorage.setItem(
+        dashboardStateKey,
+        JSON.stringify({ view, eventId: selectedEvent.id }),
+      );
+    } else {
+      window.localStorage.removeItem(dashboardStateKey);
+    }
+  }, [dashboardStateKey, loading, selectedEvent, view]);
   async function saveProfile(e) {
     e.preventDefault();
     setSaved("");
@@ -1350,15 +1380,13 @@ function PublicRegistration({ code, onHome }) {
     setMessage("");
     if (spots === 0)
       return setMessage("Registration is full. Please contact the organizer.");
-    const { error } = await supabase
-      .from("player_registrations")
-      .insert({
-        ...form,
-        full_name: form.full_name.trim(),
-        email: form.email.trim() || null,
-        phone: form.phone.trim() || null,
-        event_id: event.id,
-      });
+    const { error } = await supabase.from("player_registrations").insert({
+      ...form,
+      full_name: form.full_name.trim(),
+      email: form.email.trim() || null,
+      phone: form.phone.trim() || null,
+      event_id: event.id,
+    });
     if (error) setMessage(playerRegistrationError(error));
     else setSuccess(true);
   }
