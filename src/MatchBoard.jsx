@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { Clock3, Trophy, Users } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Clock3, Trophy, Users, Volume2, VolumeX } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
 const names = (list = []) => list.join(" · ");
@@ -8,11 +8,46 @@ export default function MatchBoard({ token }) {
   const [board, setBoard] = useState(null);
   const [error, setError] = useState("");
   const [clock, setClock] = useState(new Date());
+  const [announcementsEnabled, setAnnouncementsEnabled] = useState(false);
+  const boardRef = useRef(null);
+  const announcementsRef = useRef(false);
+
+  function speak(message) {
+    if (!announcementsRef.current || !("speechSynthesis" in window)) return;
+    const utterance = new SpeechSynthesisUtterance(message);
+    const voices = window.speechSynthesis.getVoices();
+    utterance.voice = voices.find((voice) => voice.lang === "en-PH") || voices.find((voice) => voice.lang.startsWith("en")) || null;
+    utterance.rate = 0.92;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  function announceChanges(previous, next) {
+    if (!previous) return;
+    next.courts.forEach((court) => {
+      const before = previous.courts.find((item) => item.id === court.id);
+      if (court.game && before?.game?.id !== court.game.id)
+        speak(`Now playing on ${court.name}. Game ${court.game.game_number}. ${names(court.game.team_one)}, versus ${names(court.game.team_two)}.`);
+      if (court.next_game && before?.next_game?.game_number !== court.next_game.game_number)
+        speak(`Next match on ${court.name}. Game ${court.next_game.game_number}. ${names(court.next_game.team_one)}, versus ${names(court.next_game.team_two)}. Please get ready.`);
+    });
+    const previousGames = new Set(previous.recent_games.map((game) => game.game_number));
+    [...next.recent_games].reverse().forEach((game) => {
+      if (!previousGames.has(game.game_number))
+        speak(`Game ${game.game_number} is complete on ${game.court_name}. Final score, ${game.team_one_score} to ${game.team_two_score}. Congratulations to ${names(game.winners)}.`);
+    });
+  }
 
   const load = useCallback(async () => {
     const { data, error: loadError } = await supabase.rpc("get_event_display_view", { p_token: token });
     if (loadError) setError(loadError.message);
-    else { setBoard(data); setError(""); }
+    else {
+      if (announcementsRef.current) announceChanges(boardRef.current, data);
+      boardRef.current = data;
+      setBoard(data);
+      setError("");
+    }
   }, [token]);
 
   useEffect(() => {
@@ -22,6 +57,19 @@ export default function MatchBoard({ token }) {
     return () => { window.clearInterval(refresh); window.clearInterval(tick); };
   }, [load]);
 
+  function toggleAnnouncements() {
+    if (!("speechSynthesis" in window)) return setError("Voice announcements are not supported by this browser.");
+    const next = !announcementsRef.current;
+    announcementsRef.current = next;
+    setAnnouncementsEnabled(next);
+    window.speechSynthesis.cancel();
+    if (next) {
+      const welcome = new SpeechSynthesisUtterance("PickleFlow voice announcements are now enabled.");
+      welcome.rate = 0.92;
+      window.speechSynthesis.speak(welcome);
+    }
+  }
+
   if (error) return <main className="tv-board tv-board-empty"><h1>Match Board unavailable</h1><p>{error}</p></main>;
   if (!board) return <main className="tv-board tv-board-empty"><p>Loading Match Board…</p></main>;
 
@@ -29,7 +77,7 @@ export default function MatchBoard({ token }) {
     <header className="tv-header">
       <div><span className="tv-live-dot" /> LIVE MATCH BOARD</div>
       <section><h1>{board.event_name}</h1><p>{board.venue || "PickleFlow Game Day"}</p></section>
-      <time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time>
+      <aside><time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><button className={announcementsEnabled ? "enabled" : ""} onClick={toggleAnnouncements}>{announcementsEnabled ? <Volume2 /> : <VolumeX />}<span>{announcementsEnabled ? "Voice on" : "Enable voice"}</span></button></aside>
     </header>
     <section className="tv-courts">
       {board.courts.map((court) => <article className={`tv-court ${court.game ? "playing" : "idle"}`} key={court.id}>
