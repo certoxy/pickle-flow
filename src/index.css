@@ -1000,6 +1000,20 @@ select:focus {
   max-height: 470px;
   overflow-y: auto;
 }
+.game-day-player-form {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(120px, 0.65fr) auto;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.game-day-player-form .button {
+  white-space: nowrap;
+}
+.game-day-player-help {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--muted);
+}
 .checkin-row {
   display: flex;
   align-items: center;
@@ -1809,6 +1823,9 @@ select:focus-visible {
     align-items: flex-start;
     flex-direction: column;
     padding: 13px 0;
+  }
+  .game-day-player-form {
+    grid-template-columns: 1fr;
   }
   .checkin-actions {
     width: 100%;

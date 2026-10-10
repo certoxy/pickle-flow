@@ -36,6 +36,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [substitutionPrompt, setSubstitutionPrompt] = useState(null);
   const [substitutePlayerId, setSubstitutePlayerId] = useState("");
   const [substituting, setSubstituting] = useState(false);
+  const [newPlayer, setNewPlayer] = useState({
+    full_name: "",
+    skill_level: "beginner",
+  });
+  const [addingPlayer, setAddingPlayer] = useState(false);
   const scoreSaveChains = useRef({});
   const teamSize = event.game_format === "singles" ? 1 : 2;
   const playersNeeded = teamSize * 2;
@@ -205,6 +210,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         item.id === player.id ? { ...item, checked_in_at } : item,
       ),
     );
+    const queued = await addToQueue(player.id);
+    if (queued)
+      setMessage(`${player.full_name} checked in and joined the queue.`);
   }
 
   async function markPlayerOut(player) {
@@ -271,12 +279,56 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       )
       .select()
       .single();
-    if (error) setMessage(error.message);
-    else
+    if (error) {
+      setMessage(error.message);
+      return false;
+    } else {
       setQueue([
         ...queue.filter((item) => item.player_registration_id !== playerId),
         data,
       ]);
+      return true;
+    }
+  }
+
+  async function addNewPlayer(e) {
+    e.preventDefault();
+    if (addingPlayer || !newPlayer.full_name.trim()) return;
+    setAddingPlayer(true);
+    setMessage("");
+    const checked_in_at = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("player_registrations")
+      .insert({
+        event_id: event.id,
+        full_name: newPlayer.full_name.trim(),
+        skill_level: newPlayer.skill_level,
+        email: null,
+        phone: null,
+        status: "confirmed",
+        checked_in_at,
+      })
+      .select()
+      .single();
+    if (error) {
+      const duplicateName =
+        error.code === "23505" &&
+        (error.message || "").toLowerCase().includes("name");
+      setMessage(
+        duplicateName
+          ? "A player with this name is already registered for this event."
+          : error.message,
+      );
+      setAddingPlayer(false);
+      return;
+    }
+    setPlayers((current) => [...current, data]);
+    const queued = await addToQueue(data.id);
+    if (queued) {
+      setNewPlayer({ full_name: "", skill_level: "beginner" });
+      setMessage(`${data.full_name} added, checked in, and joined the queue.`);
+    }
+    setAddingPlayer(false);
   }
 
   async function removeFromQueue(playerId) {
@@ -1116,6 +1168,36 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           <h3>
             <UserCheck size={19} /> Player check-in
           </h3>
+          <form className="game-day-player-form" onSubmit={addNewPlayer}>
+            <input
+              required
+              aria-label="New player name"
+              placeholder="New player name"
+              value={newPlayer.full_name}
+              onChange={(e) =>
+                setNewPlayer({ ...newPlayer, full_name: e.target.value })
+              }
+            />
+            <select
+              aria-label="New player skill level"
+              value={newPlayer.skill_level}
+              onChange={(e) =>
+                setNewPlayer({ ...newPlayer, skill_level: e.target.value })
+              }
+            >
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+              <option value="competitive">Competitive</option>
+            </select>
+            <button className="button button-primary" disabled={addingPlayer}>
+              <Plus size={16} />
+              {addingPlayer ? "Adding…" : "Add new player"}
+            </button>
+          </form>
+          <small className="game-day-player-help">
+            New players are automatically checked in and added to the queue.
+          </small>
           <div className="checkin-list">
             {players.map((player) => {
               const queued =
