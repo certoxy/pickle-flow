@@ -31,6 +31,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [autoAssigning, setAutoAssigning] = useState(false);
+  const [autoQueueing, setAutoQueueing] = useState(false);
   const [completionPrompt, setCompletionPrompt] = useState(null);
   const [completingGame, setCompletingGame] = useState(false);
   const [substitutionPrompt, setSubstitutionPrompt] = useState(null);
@@ -117,6 +118,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .filter((entry) => activeGames.some((game) => game.id === entry.game_id))
       .map((entry) => entry.player_registration_id),
   );
+  const availableCheckedInNotQueued = checkedIn.filter(
+    (player) =>
+      !activePlayerIds.has(player.id) &&
+      !queue.some(
+        (entry) =>
+          entry.player_registration_id === player.id &&
+          entry.status === "waiting",
+      ),
+  );
   const playingGameForCourt = (courtId) =>
     activeGames.find(
       (game) => game.court_id === courtId && game.status === "playing",
@@ -163,7 +173,62 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   );
 
   useEffect(() => {
-    if (!event.auto_assign_next_players || autoAssigning) return;
+    if (
+      !event.auto_assign_next_players ||
+      autoQueueing ||
+      !availableCheckedInNotQueued.length
+    )
+      return;
+    const firstPosition = waiting.length
+      ? Math.max(...waiting.map((entry) => entry.position)) + 1
+      : 1;
+    const joinedAt = new Date().toISOString();
+    const playerIds = availableCheckedInNotQueued.map((player) => player.id);
+    setAutoQueueing(true);
+    supabase
+      .from("game_queue")
+      .upsert(
+        playerIds.map((playerId, index) => ({
+          event_id: event.id,
+          player_registration_id: playerId,
+          position: firstPosition + index,
+          status: "waiting",
+          joined_at: joinedAt,
+        })),
+        { onConflict: "event_id,player_registration_id" },
+      )
+      .select()
+      .then(({ data, error }) => {
+        if (error) {
+          setMessage(`Players could not be auto-queued: ${error.message}`);
+          return;
+        }
+        setQueue((current) => [
+          ...current.filter(
+            (entry) => !playerIds.includes(entry.player_registration_id),
+          ),
+          ...(data || []),
+        ]);
+      })
+      .finally(() => setAutoQueueing(false));
+  }, [
+    event.auto_assign_next_players,
+    event.id,
+    players,
+    queue,
+    games,
+    gamePlayers,
+    autoQueueing,
+  ]);
+
+  useEffect(() => {
+    if (
+      !event.auto_assign_next_players ||
+      autoAssigning ||
+      autoQueueing ||
+      availableCheckedInNotQueued.length
+    )
+      return;
     const court = courts.find(courtCanAcceptMatch);
     if (!court || waiting.length < playersNeeded) return;
     setAutoAssigning(true);
@@ -181,6 +246,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     games,
     playersNeeded,
     autoAssigning,
+    autoQueueing,
   ]);
 
   async function updateEventSettings(field, value) {
