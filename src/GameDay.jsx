@@ -4,6 +4,7 @@ import {
   Check,
   Clock3,
   Copy,
+  Download,
   ExternalLink,
   Link,
   Play,
@@ -16,6 +17,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "./lib/supabase";
 
 const playerName = (players, id) =>
@@ -413,6 +415,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     } catch {
       setMessage("Copy the scoring link from the field below.");
     }
+  }
+
+  function downloadScoringQr() {
+    const canvas = document.getElementById("court-scoring-qr");
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `${scoringLink.court.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-scoring-qr.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
   }
 
   async function addToQueue(playerId) {
@@ -856,9 +867,22 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             <span className="eyebrow">Temporary umpire access</span>
             <h2 id="scorer-link-title">{scoringLink.court.name} scoring link</h2>
             <p className="muted">Anyone with this link can update this court’s live score for 24 hours. Only the organizer can confirm the result.</p>
+            <div className="scorer-qr-wrap">
+              <QRCodeCanvas
+                id="court-scoring-qr"
+                value={scoringLink.url}
+                size={220}
+                level="H"
+                marginSize={2}
+                title={`${scoringLink.court.name} scoring QR code`}
+              />
+              <strong>Scan to score {scoringLink.court.name}</strong>
+              <span>Valid for 24 hours</span>
+            </div>
             <input readOnly value={scoringLink.url} onFocus={(event) => event.target.select()} />
             <div className="dialog-actions">
               <button className="button button-secondary" onClick={() => setScoringLink(null)}>Close</button>
+              <button className="button button-secondary" onClick={downloadScoringQr}><Download size={17} /> QR code</button>
               <button className="button button-secondary" onClick={() => window.open(scoringLink.url, "_blank", "noopener,noreferrer")}><ExternalLink size={17} /> Open</button>
               <button className="button button-primary" onClick={copyScoringLink}><Copy size={17} /> Copy link</button>
             </div>

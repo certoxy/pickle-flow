@@ -2224,6 +2224,20 @@ select:focus-visible {
 }
 .court-link-button:hover { background: #eef8ff; }
 .scorer-link-dialog input { width: 100%; }
+.scorer-qr-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: 18px auto;
+  padding: 16px;
+  max-width: 270px;
+  border: 1px solid #dfe9e8;
+  border-radius: 18px;
+  background: #fff;
+}
+.scorer-qr-wrap canvas { width: min(220px, 100%); height: auto; }
+.scorer-qr-wrap strong { color: var(--navy); }
+.scorer-qr-wrap span { color: var(--muted); font-size: .8rem; }
 .court-scoring-page {
   min-height: 100vh;
   max-width: 760px;
