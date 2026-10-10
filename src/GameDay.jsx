@@ -107,6 +107,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         (a.status === "playing" ? -1 : 1),
     );
   const completedGames = games.filter((game) => game.status === "completed");
+  const activePlayerIds = new Set(
+    gamePlayers
+      .filter((entry) => activeGames.some((game) => game.id === entry.game_id))
+      .map((entry) => entry.player_registration_id),
+  );
   const playingGameForCourt = (courtId) =>
     activeGames.find(
       (game) => game.court_id === courtId && game.status === "playing",
@@ -453,7 +458,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     const outgoingName = playerName(players, slot.player_registration_id);
     await load();
     setMessage(
-      `${incomingName} replaced ${outgoingName} in Game ${game.game_number}.`,
+      `${incomingName} replaced ${outgoingName} in Game ${game.game_number}. ${outgoingName} is first in queue for the next available match.`,
     );
     setSubstituting(false);
     setSubstitutionPrompt(null);
@@ -1103,6 +1108,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 queue.find(
                   (entry) => entry.player_registration_id === player.id,
                 )?.status === "waiting";
+              const inGame = activePlayerIds.has(player.id);
               return (
                 <div className="checkin-row" key={player.id}>
                   <div>
@@ -1124,14 +1130,19 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                     </button>
                     {player.checked_in_at && (
                       <button
-                        className="small-action"
+                        className={`small-action ${inGame ? "checked" : ""}`}
+                        disabled={inGame}
                         onClick={() =>
                           queued
                             ? removeFromQueue(player.id)
                             : addToQueue(player.id)
                         }
                       >
-                        {queued ? "Leave queue" : "Join queue"}
+                        {inGame
+                          ? "In-Game"
+                          : queued
+                            ? "Leave queue"
+                            : "Join queue"}
                       </button>
                     )}
                   </div>
