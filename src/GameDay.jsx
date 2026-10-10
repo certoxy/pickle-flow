@@ -913,7 +913,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           <span>Completed</span>
         </div>
       </div>
-      <div className="game-day-grid game-day-main">
+      <div className="game-day-workspace">
+        <div className="game-day-grid game-day-main">
         <section className="profile-card">
           <h3>
             <Clock3 size={19} /> Waiting queue
@@ -1134,9 +1135,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             )}
           </div>
         </section>
-      </div>
-      <div className="game-day-grid">
-        <details
+        </div>
+        <div className="game-day-grid game-day-management">
+          <details
           className="profile-card game-settings"
           open={courts.length === 0 ? true : undefined}
         >
@@ -1319,7 +1320,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               );
             })}
           </div>
-        </section>
+          </section>
+        </div>
       </div>
       <div className="game-day-grid">
         <section className="profile-card">
