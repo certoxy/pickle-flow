@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import GameDay from "./GameDay";
+import CourtScoring from "./CourtScoring";
 
 const emptyProfile = {
   full_name: "",
@@ -1508,6 +1509,7 @@ export default function App() {
     [showAuth, setShowAuth] = useState(false),
     [loading, setLoading] = useState(isSupabaseConfigured);
   const eventCode = new URLSearchParams(window.location.search).get("event");
+  const scoringToken = new URLSearchParams(window.location.search).get("score");
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -1522,6 +1524,8 @@ export default function App() {
     );
     return () => listener.subscription.unsubscribe();
   }, []);
+  if (scoringToken && supabase)
+    return <CourtScoring token={scoringToken} />;
   if (eventCode && supabase)
     return (
       <div className="app">

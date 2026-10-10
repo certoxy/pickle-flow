@@ -2208,6 +2208,57 @@ select:focus-visible {
 .settings-content {
   margin-top: 18px;
 }
+.court-access-item {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.court-access-item .court-chip { flex: 1; }
+.court-link-button {
+  width: 40px;
+  border: 1px solid #d8e1e8;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--blue);
+  cursor: pointer;
+}
+.court-link-button:hover { background: #eef8ff; }
+.scorer-link-dialog input { width: 100%; }
+.court-scoring-page {
+  min-height: 100vh;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 18px;
+  background: #f3f8f8;
+}
+.scorer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.scorer-header img { width: 150px; }
+.scorer-header div { text-align: right; display: grid; }
+.scorer-header span { color: var(--muted); font-size: .8rem; }
+.scorer-header strong { color: var(--navy); }
+.scorer-card, .scorer-empty { background: #fff; border-radius: 22px; padding: 22px; box-shadow: 0 12px 36px rgba(16, 51, 60, .1); text-align: center; }
+.scorer-card h1 { margin: 5px 0 20px; font-size: 1.25rem; color: var(--navy); }
+.scorer-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.scorer-teams article { border: 1px solid #dfe9e8; border-radius: 18px; padding: 18px 12px; display: grid; gap: 10px; }
+.scorer-teams article > span { color: var(--muted); font-weight: 800; text-transform: uppercase; font-size: .72rem; letter-spacing: .08em; }
+.scorer-teams h2 { min-height: 48px; margin: 0; font-size: clamp(.9rem, 4vw, 1.15rem); }
+.scorer-teams article > strong { color: var(--navy); font-size: clamp(4.5rem, 24vw, 8rem); line-height: .9; }
+.scorer-controls { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.scorer-controls button { min-height: 56px; border: 0; border-radius: 14px; background: #e7f3f3; color: var(--navy); cursor: pointer; }
+.scorer-controls button:last-child { background: var(--blue); color: #fff; }
+.scorer-controls button:disabled { opacity: .45; }
+.scorer-winner { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px; border-radius: 12px; background: #fff4cc; color: #705400; text-align: left; }
+.scorer-empty { margin-top: 12vh; }
+.scorer-empty > svg { color: var(--blue); width: 42px; height: 42px; }
+.scorer-next, .scorer-note { text-align: center; color: var(--muted); }
+.scorer-next { font-weight: 800; color: var(--navy); }
+@media (max-width: 520px) {
+  .court-scoring-page { padding: 12px; }
+  .scorer-header img { width: 125px; }
+  .scorer-card { padding: 16px 10px; }
+  .scorer-teams { gap: 8px; }
+  .scorer-teams article { padding: 14px 7px; }
+}
 .player-contact {
   display: none;
 }

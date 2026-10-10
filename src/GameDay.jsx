@@ -3,6 +3,9 @@ import {
   ArrowLeft,
   Check,
   Clock3,
+  Copy,
+  ExternalLink,
+  Link,
   Play,
   Plus,
   RefreshCw,
@@ -35,6 +38,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [autoQueueing, setAutoQueueing] = useState(false);
   const [completionPrompt, setCompletionPrompt] = useState(null);
   const [completingGame, setCompletingGame] = useState(false);
+  const [scoringLink, setScoringLink] = useState(null);
   const [substitutionPrompt, setSubstitutionPrompt] = useState(null);
   const [substitutePlayerId, setSubstitutePlayerId] = useState("");
   const [substituting, setSubstituting] = useState(false);
@@ -140,6 +144,19 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               two: Number(nextGame.team_two_score || 0),
             },
           }));
+          const one = Number(nextGame.team_one_score || 0);
+          const two = Number(nextGame.team_two_score || 0);
+          if (
+            nextGame.status === "playing" &&
+            Math.max(one, two) >= nextGame.points_to_win &&
+            one !== two
+          ) {
+            setCompletionPrompt((current) =>
+              current?.game?.id === nextGame.id
+                ? current
+                : { game: nextGame, score: { one, two } },
+            );
+          }
         },
       )
       .subscribe();
@@ -376,6 +393,26 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           item.id === court.id ? { ...item, status } : item,
         ),
       );
+  }
+
+  async function openScoringLink(court) {
+    setMessage("");
+    const { data, error } = await supabase.rpc("create_court_scoring_access", {
+      p_court_id: court.id,
+    });
+    if (error) return setMessage(error.message);
+    const access = data?.[0];
+    const url = `${window.location.origin}/?score=${access.access_token}`;
+    setScoringLink({ court, url, expiresAt: access.expires_at });
+  }
+
+  async function copyScoringLink() {
+    try {
+      await navigator.clipboard.writeText(scoringLink.url);
+      setMessage(`${scoringLink.court.name} scoring link copied.`);
+    } catch {
+      setMessage("Copy the scoring link from the field below.");
+    }
   }
 
   async function addToQueue(playerId) {
@@ -812,6 +849,22 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     );
   return (
     <section className="game-day-page">
+      {scoringLink && (
+        <div className="modal-backdrop">
+          <section className="game-complete-dialog scorer-link-dialog" role="dialog" aria-modal="true" aria-labelledby="scorer-link-title">
+            <span className="dialog-icon"><Link size={25} /></span>
+            <span className="eyebrow">Temporary umpire access</span>
+            <h2 id="scorer-link-title">{scoringLink.court.name} scoring link</h2>
+            <p className="muted">Anyone with this link can update this court’s live score for 24 hours. Only the organizer can confirm the result.</p>
+            <input readOnly value={scoringLink.url} onFocus={(event) => event.target.select()} />
+            <div className="dialog-actions">
+              <button className="button button-secondary" onClick={() => setScoringLink(null)}>Close</button>
+              <button className="button button-secondary" onClick={() => window.open(scoringLink.url, "_blank", "noopener,noreferrer")}><ExternalLink size={17} /> Open</button>
+              <button className="button button-primary" onClick={copyScoringLink}><Copy size={17} /> Copy link</button>
+            </div>
+          </section>
+        </div>
+      )}
       {completionPrompt && (
         <div className="modal-backdrop">
           <section
@@ -1278,15 +1331,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             </form>
             <div className="court-list">
               {courts.map((court) => (
-                <button
-                  key={court.id}
-                  className={`court-chip ${court.status}`}
-                  disabled={court.status === "in_use"}
-                  onClick={() => toggleCourt(court)}
-                >
-                  {court.name}
-                  <span>{court.status.replace("_", " ")}</span>
-                </button>
+                <div className="court-access-item" key={court.id}>
+                  <button className={`court-chip ${court.status}`} disabled={court.status === "in_use"} onClick={() => toggleCourt(court)}>
+                    {court.name}<span>{court.status.replace("_", " ")}</span>
+                  </button>
+                  <button className="court-link-button" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
+                </div>
               ))}
               {!courts.length && (
                 <p className="muted">
