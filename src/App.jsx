@@ -20,6 +20,7 @@ import {
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import GameDay from "./GameDay";
 import CourtScoring from "./CourtScoring";
+import MatchBoard from "./MatchBoard";
 
 const emptyProfile = {
   full_name: "",
@@ -1510,6 +1511,7 @@ export default function App() {
     [loading, setLoading] = useState(isSupabaseConfigured);
   const eventCode = new URLSearchParams(window.location.search).get("event");
   const scoringToken = new URLSearchParams(window.location.search).get("score");
+  const displayToken = new URLSearchParams(window.location.search).get("display");
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -1526,6 +1528,8 @@ export default function App() {
   }, []);
   if (scoringToken && supabase)
     return <CourtScoring token={scoringToken} />;
+  if (displayToken && supabase)
+    return <MatchBoard token={displayToken} />;
   if (eventCode && supabase)
     return (
       <div className="app">

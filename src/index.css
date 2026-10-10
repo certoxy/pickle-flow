@@ -2238,6 +2238,45 @@ select:focus-visible {
 .scorer-qr-wrap canvas { width: min(220px, 100%); height: auto; }
 .scorer-qr-wrap strong { color: var(--navy); }
 .scorer-qr-wrap span { color: var(--muted); font-size: .8rem; }
+.game-day-title-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.tv-board { min-height: 100vh; padding: clamp(18px, 2vw, 34px); color: #f7fbff; background: radial-gradient(circle at 15% 0%, #174f5d 0, #092c37 36%, #061d27 100%); font-family: Inter, system-ui, sans-serif; }
+.tv-header { display: grid; grid-template-columns: 1fr 2fr 1fr; align-items: center; gap: 20px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.18); }
+.tv-header > div { font-size: clamp(.7rem, 1.2vw, 1rem); font-weight: 900; letter-spacing: .12em; color: #a8f04b; }
+.tv-live-dot { display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; background: #a8f04b; box-shadow: 0 0 16px #a8f04b; }
+.tv-header section { text-align: center; }
+.tv-header h1 { margin: 0; font-size: clamp(1.6rem, 3vw, 3rem); }
+.tv-header p { margin: 4px 0 0; color: #a9c2ca; }
+.tv-header time { text-align: right; font-size: clamp(1.4rem, 2.6vw, 2.6rem); font-weight: 900; }
+.tv-courts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; margin: 20px 0; }
+.tv-court { overflow: hidden; border: 1px solid rgba(255,255,255,.16); border-radius: 20px; background: rgba(255,255,255,.07); box-shadow: 0 16px 40px rgba(0,0,0,.16); }
+.tv-court > header { display: flex; justify-content: space-between; align-items: center; padding: 15px 18px; background: rgba(0,0,0,.16); }
+.tv-court h2 { margin: 0; font-size: clamp(1.1rem, 2vw, 1.7rem); }
+.tv-court > header span { color: #a8f04b; font-weight: 900; letter-spacing: .08em; }
+.tv-score { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; min-height: 190px; padding: 18px; text-align: center; }
+.tv-score div { display: grid; gap: 8px; }
+.tv-score strong { font-size: clamp(4.2rem, 8vw, 8rem); line-height: .85; color: #fff; }
+.tv-score span { font-size: clamp(.85rem, 1.35vw, 1.25rem); font-weight: 800; }
+.tv-score b { color: #6e929c; font-size: 2rem; }
+.tv-court > footer { display: grid; grid-template-columns: auto 1fr; gap: 12px; padding: 12px 18px; background: rgba(0,0,0,.2); }
+.tv-court > footer span { color: #a8f04b; font-size: .72rem; font-weight: 900; }
+.tv-court > footer strong { font-size: clamp(.75rem, 1vw, .95rem); }
+.tv-no-game { min-height: 190px; display: grid; place-content: center; justify-items: center; gap: 12px; color: #94afb7; font-size: 1.2rem; font-weight: 800; }
+.tv-lower { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; }
+.tv-lower article { padding: 18px; border: 1px solid rgba(255,255,255,.13); border-radius: 18px; background: rgba(255,255,255,.06); }
+.tv-lower h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 14px; font-size: clamp(1rem, 1.5vw, 1.35rem); }
+.tv-lower h2 span { padding: 3px 9px; border-radius: 20px; color: #092c37; background: #a8f04b; font-size: .8rem; }
+.tv-queue > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.tv-queue > div > span { display: flex; align-items: center; gap: 9px; padding: 8px; border-radius: 9px; background: rgba(255,255,255,.07); font-weight: 800; }
+.tv-queue b { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; color: #092c37; background: #a8f04b; }
+.tv-winners > div { display: grid; gap: 7px; }
+.tv-winners span { display: grid; grid-template-columns: 1fr 1.5fr auto; gap: 9px; align-items: center; padding: 8px; border-bottom: 1px solid rgba(255,255,255,.09); }
+.tv-winners strong { color: #a8f04b; }
+.tv-winners em { font-style: normal; font-weight: 900; }
+.tv-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; color: #8ba9b2; font-size: .8rem; }
+.tv-footer img { width: 125px; filter: brightness(0) invert(1); opacity: .85; }
+.tv-board-empty { display: grid; place-content: center; text-align: center; }
+@media (max-width: 760px) { .tv-header { grid-template-columns: 1fr auto; } .tv-header section { grid-column: 1 / -1; grid-row: 2; } .tv-lower { grid-template-columns: 1fr; } }
 .court-scoring-page {
   min-height: 100vh;
   max-width: 760px;

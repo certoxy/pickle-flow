@@ -7,6 +7,7 @@ import {
   Download,
   ExternalLink,
   Link,
+  MonitorUp,
   Play,
   Plus,
   RefreshCw,
@@ -41,6 +42,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [completionPrompt, setCompletionPrompt] = useState(null);
   const [completingGame, setCompletingGame] = useState(false);
   const [scoringLink, setScoringLink] = useState(null);
+  const [displayLink, setDisplayLink] = useState(null);
   const [substitutionPrompt, setSubstitutionPrompt] = useState(null);
   const [substitutePlayerId, setSubstitutePlayerId] = useState("");
   const [substituting, setSubstituting] = useState(false);
@@ -424,6 +426,27 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     link.download = `${scoringLink.court.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-scoring-qr.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
+  }
+
+  async function openDisplayLink() {
+    setMessage("");
+    const { data, error } = await supabase.rpc("create_event_display_access", { p_event_id: event.id });
+    if (error) return setMessage(error.message);
+    const access = data?.[0];
+    setDisplayLink({ url: `${window.location.origin}/?display=${access.access_token}` });
+  }
+
+  function downloadDisplayQr() {
+    const canvas = document.getElementById("event-display-qr");
+    if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `${event.name.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-match-board-qr.png`;
+    link.href = canvas.toDataURL("image/png"); link.click();
+  }
+
+  async function copyDisplayLink() {
+    try { await navigator.clipboard.writeText(displayLink.url); setMessage("Match Board link copied."); }
+    catch { setMessage("Copy the Match Board link from the field below."); }
   }
 
   async function addToQueue(playerId) {
@@ -860,6 +883,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     );
   return (
     <section className="game-day-page">
+      {displayLink && <div className="modal-backdrop"><section className="game-complete-dialog scorer-link-dialog" role="dialog" aria-modal="true">
+        <span className="dialog-icon"><MonitorUp size={25} /></span><span className="eyebrow">Smart TV display</span>
+        <h2>Event Match Board</h2><p className="muted">Open this link on the club TV. It updates automatically and remains valid for 7 days.</p>
+        <div className="scorer-qr-wrap"><QRCodeCanvas id="event-display-qr" value={displayLink.url} size={220} level="H" marginSize={2} title="Match Board QR code" /><strong>Scan to open Match Board</strong><span>Valid for 7 days</span></div>
+        <input readOnly value={displayLink.url} onFocus={(e) => e.target.select()} />
+        <div className="dialog-actions"><button className="button button-secondary" onClick={() => setDisplayLink(null)}>Close</button><button className="button button-secondary" onClick={downloadDisplayQr}><Download size={17} /> QR code</button><button className="button button-secondary" onClick={() => window.open(displayLink.url, "_blank", "noopener,noreferrer")}><ExternalLink size={17} /> Open board</button><button className="button button-primary" onClick={copyDisplayLink}><Copy size={17} /> Copy link</button></div>
+      </section></div>}
       {scoringLink && (
         <div className="modal-backdrop">
           <section className="game-complete-dialog scorer-link-dialog" role="dialog" aria-modal="true" aria-labelledby="scorer-link-title">
@@ -1018,9 +1048,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </span>
           <h2>{event.name}</h2>
         </div>
-        <button className="button button-secondary" onClick={onBack}>
-          <ArrowLeft size={16} /> Event roster
-        </button>
+        <div className="game-day-title-actions"><button className="button button-secondary" onClick={openDisplayLink}><MonitorUp size={16} /> Match Board</button><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
       </div>
       {message && <div className="form-message game-message">{message}</div>}
       <div className="game-day-summary">
