@@ -1044,6 +1044,15 @@ select:focus {
   color: #41630a;
   background: #eef9d8;
 }
+.small-action.player-out-action {
+  color: #9f2f2f;
+  border-color: #f2caca;
+  background: #fff7f7;
+}
+.small-action:disabled {
+  opacity: 0.72;
+  cursor: default;
+}
 .queue-row {
   display: grid;
   grid-template-columns: auto auto 1fr auto;

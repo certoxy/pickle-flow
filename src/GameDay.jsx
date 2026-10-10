@@ -192,10 +192,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     else onEventUpdated(data);
   }
 
-  async function toggleCheckIn(player) {
-    const checked_in_at = player.checked_in_at
-      ? null
-      : new Date().toISOString();
+  async function checkInPlayer(player) {
+    if (player.checked_in_at) return;
+    const checked_in_at = new Date().toISOString();
     const { error } = await supabase
       .from("player_registrations")
       .update({ checked_in_at })
@@ -206,7 +205,22 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         item.id === player.id ? { ...item, checked_in_at } : item,
       ),
     );
-    if (!checked_in_at) await removeFromQueue(player.id);
+  }
+
+  async function markPlayerOut(player) {
+    if (!player.checked_in_at || activePlayerIds.has(player.id)) return;
+    const { error } = await supabase
+      .from("player_registrations")
+      .update({ checked_in_at: null })
+      .eq("id", player.id);
+    if (error) return setMessage(error.message);
+    await removeFromQueue(player.id);
+    setPlayers(
+      players.map((item) =>
+        item.id === player.id ? { ...item, checked_in_at: null } : item,
+      ),
+    );
+    setMessage(`${player.full_name} is marked out for this event.`);
   }
 
   async function addCourt(e) {
@@ -1118,11 +1132,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   <div className="checkin-actions">
                     <button
                       className={`small-action ${player.checked_in_at ? "checked" : ""}`}
-                      onClick={() => toggleCheckIn(player)}
+                      disabled={Boolean(player.checked_in_at)}
+                      onClick={() => checkInPlayer(player)}
                     >
                       {player.checked_in_at ? (
                         <>
-                          <Check size={15} /> Present
+                          <Check size={15} /> Checked In
                         </>
                       ) : (
                         "Check in"
@@ -1133,18 +1148,24 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                         className={`small-action ${inGame ? "checked" : ""}`}
                         disabled={inGame}
                         onClick={() =>
-                          queued
-                            ? removeFromQueue(player.id)
-                            : addToQueue(player.id)
+                          !queued && !inGame ? addToQueue(player.id) : undefined
                         }
                       >
-                        {inGame
-                          ? "In-Game"
-                          : queued
-                            ? "Leave queue"
-                            : "Join queue"}
+                        {inGame ? "In-Game" : queued ? "Waiting" : "Join queue"}
                       </button>
                     )}
+                    <button
+                      className="small-action player-out-action"
+                      disabled={!player.checked_in_at || inGame}
+                      onClick={() => markPlayerOut(player)}
+                      title={
+                        inGame
+                          ? "Substitute this player before marking them out"
+                          : "Remove from Game Day participation"
+                      }
+                    >
+                      Out
+                    </button>
                   </div>
                 </div>
               );
