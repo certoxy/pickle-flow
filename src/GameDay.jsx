@@ -26,6 +26,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [gamePlayers, setGamePlayers] = useState([]);
   const [courtName, setCourtName] = useState("");
   const [selectedCourt, setSelectedCourt] = useState("");
+  const [monitoredCourt, setMonitoredCourt] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [scores, setScores] = useState({});
   const [message, setMessage] = useState("");
@@ -101,6 +102,52 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     load();
   }, [event.id]);
 
+  useEffect(() => {
+    const channel = supabase
+      .channel(`game-day-scores-${event.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "games",
+          filter: `event_id=eq.${event.id}`,
+        },
+        ({ eventType, new: nextGame, old: previousGame }) => {
+          if (eventType === "DELETE") {
+            setGames((current) =>
+              current.filter((game) => game.id !== previousGame.id),
+            );
+            setScores((current) => {
+              const next = { ...current };
+              delete next[previousGame.id];
+              return next;
+            });
+            return;
+          }
+          setGames((current) => {
+            const exists = current.some((game) => game.id === nextGame.id);
+            return exists
+              ? current.map((game) =>
+                  game.id === nextGame.id ? { ...game, ...nextGame } : game,
+                )
+              : [nextGame, ...current];
+          });
+          setScores((current) => ({
+            ...current,
+            [nextGame.id]: {
+              one: Number(nextGame.team_one_score || 0),
+              two: Number(nextGame.team_two_score || 0),
+            },
+          }));
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [event.id]);
+
   const waiting = queue
     .filter((entry) => entry.status === "waiting")
     .sort((a, b) => a.position - b.position);
@@ -114,6 +161,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         a.game_number - b.game_number,
     );
   const completedGames = games.filter((game) => game.status === "completed");
+  const monitoredGames = monitoredCourt
+    ? activeGames.filter((game) => game.court_id === monitoredCourt)
+    : activeGames;
   const activePlayerIds = new Set(
     gamePlayers
       .filter((entry) => activeGames.some((game) => game.id === entry.game_id))
@@ -1009,11 +1059,25 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </div>
         </section>
         <section className="profile-card">
-          <h3>
-            <Play size={19} /> Matches
-          </h3>
+          <div className="match-panel-heading">
+            <h3>
+              <Play size={19} /> Matches
+            </h3>
+            <select
+              aria-label="Monitor a court"
+              value={monitoredCourt}
+              onChange={(e) => setMonitoredCourt(e.target.value)}
+            >
+              <option value="">All courts</option>
+              {courts.map((court) => (
+                <option key={court.id} value={court.id}>
+                  {court.name}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="match-list">
-            {activeGames.map((game) => (
+            {monitoredGames.map((game) => (
               <article
                 className={`match-card ${game.status} ${isNextMatch(game) ? "next-match" : ""}`}
                 key={game.id}
@@ -1131,7 +1195,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 )}
               </article>
             ))}
-            {!activeGames.length && (
+            {!monitoredGames.length && (
               <p className="muted">No queued or active matches.</p>
             )}
           </div>
