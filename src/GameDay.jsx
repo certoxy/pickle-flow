@@ -109,8 +109,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     .filter((game) => ["queued", "playing"].includes(game.status))
     .sort(
       (a, b) =>
+        (a.status === b.status ? 0 : a.status === "playing" ? -1 : 1) ||
         a.court_id?.localeCompare(b.court_id || "") ||
-        (a.status === "playing" ? -1 : 1),
+        a.game_number - b.game_number,
     );
   const completedGames = games.filter((game) => game.status === "completed");
   const activePlayerIds = new Set(
