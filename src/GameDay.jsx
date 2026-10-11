@@ -1419,6 +1419,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 setNewPlayer({ ...newPlayer, skill_level: e.target.value })
               }
             >
+              <option value="novice">Novice</option>
               <option value="beginner">Beginner</option>
               <option value="intermediate">Intermediate</option>
               <option value="advanced">Advanced</option>
