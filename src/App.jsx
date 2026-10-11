@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeft,
   CalendarDays,
   CheckCircle2,
   Copy,
   Download,
   Edit3,
   Heart,
+  ExternalLink,
   FileUp,
   LogOut,
   LocateFixed,
@@ -103,7 +105,6 @@ function Header({ session, onSignOut }) {
 }
 
 function Landing({ onStart, onLogin }) {
-  const donationUrl = import.meta.env.VITE_DONATION_URL;
   return (
     <>
       <main>
@@ -220,29 +221,110 @@ function Landing({ onStart, onLogin }) {
               future game-day features.
             </p>
           </div>
-          {donationUrl ? (
-            <a
-              className="button button-donate"
-              href={donationUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Support PickleFlow
-            </a>
-          ) : (
-            <button
-              className="button button-donate"
-              onClick={() =>
-                alert("Thank you! The donation option will be available soon.")
-              }
-            >
-              I’d like to support
-            </button>
-          )}
+          <a className="button button-donate" href="/donate">
+            Support PickleFlow
+          </a>
         </section>
       </main>
       <footer>PickleFlow · A PAOTECHS-powered community project</footer>
     </>
+  );
+}
+
+function DonationPage() {
+  const [copied, setCopied] = useState("");
+
+  async function copyNumber(provider, number) {
+    try {
+      await navigator.clipboard.writeText(number);
+      setCopied(provider);
+      window.setTimeout(() => setCopied(""), 1800);
+    } catch {
+      window.prompt(`Copy this ${provider} number:`, number);
+    }
+  }
+
+  const wallets = [
+    {
+      id: "gcash",
+      name: "GCash",
+      number: "0917 671 0751",
+      copyValue: "09176710751",
+      image: "/donations/gcash-qr.jpeg",
+      className: "wallet-gcash",
+    },
+    {
+      id: "maya",
+      name: "Maya",
+      number: "0998 537 8242",
+      copyValue: "09985378242",
+      image: "/donations/maya-qr.jpeg",
+      className: "wallet-maya",
+    },
+  ];
+
+  return (
+    <main className="donate-page">
+      <a className="donate-back" href="/">
+        <ArrowLeft size={17} /> Back to PickleFlow
+      </a>
+      <section className="donate-hero">
+        <div className="donate-heart"><Heart size={28} /></div>
+        <span className="eyebrow">Community supported</span>
+        <h1>Help keep PickleFlow free.</h1>
+        <p>
+          PickleFlow is free for event organizers. Your optional donation helps
+          cover hosting, maintenance, and continued development of game-day tools.
+        </p>
+      </section>
+
+      <section className="donation-options" aria-label="Donation methods">
+        <article className="payment-card paypal-card">
+          <div className="payment-card-heading">
+            <span className="payment-mark paypal-mark">P</span>
+            <div><span>International</span><h2>PayPal</h2></div>
+          </div>
+          <p>Donate securely in your preferred currency through PayPal.</p>
+          <a
+            className="button payment-action paypal-action"
+            href="https://paypal.me/GlennOcay"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open PayPal <ExternalLink size={17} />
+          </a>
+        </article>
+
+        {wallets.map((wallet) => (
+          <article className={`payment-card ${wallet.className}`} key={wallet.id}>
+            <div className="payment-card-heading">
+              <span className="payment-mark">{wallet.name[0]}</span>
+              <div><span>Philippines</span><h2>{wallet.name}</h2></div>
+            </div>
+            <div className="wallet-qr-wrap">
+              <img src={wallet.image} alt={`${wallet.name} QR code for PickleFlow donations`} />
+            </div>
+            <strong className="recipient-name">Glenn Ocay</strong>
+            <div className="wallet-number">
+              <span>{wallet.number}</span>
+              <button type="button" onClick={() => copyNumber(wallet.name, wallet.copyValue)}>
+                {copied === wallet.name ? <CheckCircle2 size={16} /> : <Copy size={16} />}
+                {copied === wallet.name ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </article>
+        ))}
+      </section>
+
+      <section className="donation-note">
+        <ShieldCheck size={22} />
+        <p>
+          Donations are optional and do not unlock additional features. Payments
+          are handled directly by PayPal, GCash, or Maya. Before sending, please
+          verify that the recipient is <strong>Glenn Ocay</strong>.
+        </p>
+      </section>
+    </main>
   );
 }
 
@@ -1880,6 +1962,7 @@ export default function App() {
   const eventCode = new URLSearchParams(window.location.search).get("event");
   const scoringToken = new URLSearchParams(window.location.search).get("score");
   const displayToken = new URLSearchParams(window.location.search).get("display");
+  const isDonationPage = window.location.pathname.replace(/\/+$/, "") === "/donate";
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -1898,6 +1981,14 @@ export default function App() {
     return <CourtScoring token={scoringToken} />;
   if (displayToken && supabase)
     return <MatchBoard token={displayToken} />;
+  if (isDonationPage)
+    return (
+      <div className="app">
+        <Header />
+        <DonationPage />
+        <footer>PickleFlow · A PAOTECHS-powered community project</footer>
+      </div>
+    );
   if (eventCode && supabase)
     return (
       <div className="app">

@@ -419,6 +419,160 @@ main {
   color: #5b4800;
   background: var(--yellow);
 }
+
+.donate-page {
+  max-width: 1080px;
+  padding-top: 24px;
+}
+.donate-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--navy);
+  font-weight: 800;
+  text-decoration: none;
+}
+.donate-hero {
+  max-width: 720px;
+  margin: 56px auto 42px;
+  text-align: center;
+}
+.donate-heart {
+  width: 62px;
+  height: 62px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  color: #5b4800;
+  background: var(--yellow);
+  border-radius: 20px;
+  transform: rotate(-4deg);
+  box-shadow: 0 12px 28px rgba(255, 216, 77, 0.28);
+}
+.donate-heart svg { transform: rotate(4deg); }
+.donate-hero h1 {
+  margin: 12px 0 18px;
+  color: var(--navy);
+  font-size: clamp(2.35rem, 6vw, 4.5rem);
+  line-height: 1;
+  letter-spacing: -0.055em;
+}
+.donate-hero p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+  line-height: 1.75;
+}
+.donation-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.payment-card {
+  overflow: hidden;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 14px 38px rgba(18, 59, 102, 0.09);
+}
+.payment-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.payment-card-heading span:not(.payment-mark) {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.payment-card-heading h2 { margin: 2px 0 0; color: var(--navy); }
+.payment-mark {
+  width: 45px;
+  height: 45px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  color: white;
+  background: #0667dd;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+.wallet-maya .payment-mark { background: #00a950; }
+.paypal-mark { background: #063a7a; }
+.payment-card > p {
+  min-height: 76px;
+  margin: 30px 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+.payment-action { width: 100%; }
+.paypal-action { color: white; background: #0878d1; }
+.wallet-qr-wrap {
+  margin: 20px -4px 15px;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: white;
+}
+.wallet-qr-wrap img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+.wallet-gcash .wallet-qr-wrap img { object-position: center 44%; }
+.wallet-maya .wallet-qr-wrap img { object-position: center 43%; }
+.recipient-name {
+  display: block;
+  color: var(--navy);
+  text-align: center;
+  font-size: 0.88rem;
+}
+.wallet-number {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px 10px 14px;
+  border-radius: 12px;
+  color: var(--navy);
+  background: #f2f7fb;
+  font-weight: 800;
+}
+.wallet-number button {
+  border: 0;
+  padding: 7px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 9px;
+  color: var(--navy);
+  background: white;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+.donation-note {
+  max-width: 820px;
+  margin: 30px auto 0;
+  padding: 18px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  border: 1px solid #dbe7ef;
+  border-radius: 17px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.65);
+}
+.donation-note svg { flex: 0 0 auto; color: #4c7110; }
+.donation-note p { margin: 0; line-height: 1.6; }
 footer {
   padding: 28px 24px 40px;
   color: var(--muted);
@@ -1597,6 +1751,9 @@ select:focus {
   .donation-card .button {
     grid-column: 1 / -1;
   }
+  .donation-options { grid-template-columns: 1fr 1fr; }
+  .paypal-card { grid-column: 1 / -1; }
+  .payment-card > p { min-height: 0; }
   .roster-toolbar {
     grid-template-columns: 1fr 1fr;
   }
@@ -1726,6 +1883,14 @@ select:focus {
   }
 }
 @media (max-width: 520px) {
+  .donate-page { padding: 18px 16px 54px; }
+  .donate-hero { margin: 38px auto 30px; }
+  .donate-hero h1 { font-size: 2.55rem; }
+  .donation-options { grid-template-columns: 1fr; }
+  .paypal-card { grid-column: auto; }
+  .payment-card { padding: 20px; border-radius: 21px; }
+  .wallet-qr-wrap { max-width: 320px; margin-left: auto; margin-right: auto; }
+  .donation-note { font-size: 0.86rem; }
   main {
     padding-left: 16px;
     padding-right: 16px;
