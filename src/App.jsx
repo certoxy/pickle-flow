@@ -6,6 +6,7 @@ import {
   Download,
   Edit3,
   Heart,
+  FileUp,
   LogOut,
   MapPin,
   Plus,
@@ -59,6 +60,23 @@ const addDays = (date, days) => {
   value.setDate(value.getDate() + days);
   return value.toISOString().slice(0, 10);
 };
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], cell = "", quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"' && quoted && text[index + 1] === '"') { cell += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === "," && !quoted) { row.push(cell); cell = ""; }
+    else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(cell); if (row.some((value) => value.trim())) rows.push(row); row = []; cell = "";
+    } else cell += char;
+  }
+  row.push(cell); if (row.some((value) => value.trim())) rows.push(row);
+  return rows;
+}
 
 function Header({ session, onSignOut }) {
   return (
@@ -617,7 +635,10 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
       reason: "",
     }),
     [showReopenPrompt, setShowReopenPrompt] = useState(false),
-    [reopening, setReopening] = useState(false);
+    [reopening, setReopening] = useState(false),
+    [showImport, setShowImport] = useState(false),
+    [importRows, setImportRows] = useState([]),
+    [importing, setImporting] = useState(false);
   const registrationOpen = event.status === "open";
   const deletionDate =
     event.retention_extended_until || addDays(event.event_date, 15);
@@ -817,6 +838,66 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
     link.click();
     URL.revokeObjectURL(link.href);
   }
+  function downloadImportTemplate() {
+    const csv = "Full Name,Email,Phone,Skill Level\nMaria Santos,maria@example.com,09171234567,intermediate\nJuan Dela Cruz,,,beginner\n";
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    link.download = "pickleflow-player-import-template.csv";
+    link.click(); URL.revokeObjectURL(link.href);
+  }
+  async function readImportFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    const parsed = parseCsv(await file.text());
+    if (parsed.length < 2) return setMessage("The CSV file does not contain any player rows.");
+    const headers = parsed[0].map((value) => value.trim().toLowerCase().replace(/[^a-z0-9]/g, ""));
+    const findColumn = (...names) => headers.findIndex((header) => names.includes(header));
+    const nameIndex = findColumn("fullname", "player", "playername", "name");
+    const emailIndex = findColumn("email", "emailaddress");
+    const phoneIndex = findColumn("phone", "phonenumber", "mobile");
+    const skillIndex = findColumn("skill", "skilllevel", "level");
+    if (nameIndex < 0) return setMessage('The CSV must include a "Full Name" column.');
+    const existingNames = new Set(players.map((player) => player.full_name.trim().toLowerCase()));
+    const fileNames = new Set();
+    const allowedSkills = new Set(["beginner", "intermediate", "advanced", "competitive"]);
+    const rows = parsed.slice(1).map((values, index) => {
+      const full_name = (values[nameIndex] || "").trim();
+      const email = emailIndex >= 0 ? (values[emailIndex] || "").trim() : "";
+      const phone = phoneIndex >= 0 ? (values[phoneIndex] || "").trim() : "";
+      const skill = skillIndex >= 0 ? (values[skillIndex] || "beginner").trim().toLowerCase().replaceAll(" ", "_") : "beginner";
+      const key = full_name.toLowerCase();
+      let error = "";
+      if (!full_name) error = "Full name is required";
+      else if (existingNames.has(key)) error = "Name already exists in this event";
+      else if (fileNames.has(key)) error = "Duplicate name in file";
+      else if (!allowedSkills.has(skill)) error = "Invalid skill level";
+      else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) error = "Invalid email address";
+      fileNames.add(key);
+      return { row: index + 2, full_name, email, phone, skill_level: skill, error };
+    });
+    setImportRows(rows); setShowImport(true); setMessage("");
+  }
+  async function importPlayers() {
+    const validRows = importRows.filter((row) => !row.error);
+    if (!validRows.length) return;
+    setImporting(true);
+    const added = [], failed = [];
+    for (const row of validRows) {
+      const { data, error } = await supabase.from("player_registrations").insert({
+        event_id: event.id, full_name: row.full_name,
+        email: row.email || null, phone: row.phone || null,
+        skill_level: row.skill_level,
+      }).select().single();
+      if (error) failed.push({ ...row, error: playerRegistrationError(error) });
+      else added.push(data);
+    }
+    setPlayers([...players, ...added]);
+    setImportRows(failed);
+    setImporting(false);
+    if (!failed.length) setShowImport(false);
+    setMessage(`${added.length} player${added.length === 1 ? "" : "s"} imported${failed.length ? `; ${failed.length} could not be imported.` : "."}`);
+  }
   return (
     <section className="profile-card roster-card">
       <div className="section-title">
@@ -981,7 +1062,16 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
         >
           <Download size={16} /> Export CSV
         </button>
+        <label className="button button-secondary import-file-button">
+          <FileUp size={16} /> Import CSV
+          <input type="file" accept=".csv,text/csv" onChange={readImportFile} />
+        </label>
       </div>
+      {showImport && <section className="inline-panel import-panel">
+        <div className="import-heading"><div><h3>Import player list</h3><p className="muted">Review the file before importing. Email and phone are optional.</p></div><button className="text-button compact" onClick={downloadImportTemplate}><Download size={15} /> Download template</button></div>
+        <div className="import-preview"><table className="player-table"><thead><tr><th>Row</th><th>Player</th><th>Contact</th><th>Skill</th><th>Validation</th></tr></thead><tbody>{importRows.map((row) => <tr key={row.row}><td>{row.row}</td><td><strong>{row.full_name || "Missing name"}</strong></td><td>{row.email || row.phone || "—"}</td><td className="capitalize">{row.skill_level.replaceAll("_", " ")}</td><td><span className={`import-status ${row.error ? "invalid" : "valid"}`}>{row.error || "Ready"}</span></td></tr>)}</tbody></table></div>
+        <div className="dialog-actions"><button className="button button-secondary" onClick={() => { setShowImport(false); setImportRows([]); }} disabled={importing}>Cancel</button><button className="button button-secondary" onClick={downloadImportTemplate}><Download size={16} /> Template</button><button className="button button-primary" onClick={importPlayers} disabled={importing || !importRows.some((row) => !row.error)}><FileUp size={16} /> {importing ? "Importing…" : `Import ${importRows.filter((row) => !row.error).length} players`}</button></div>
+      </section>}
       {showWalkIn && registrationOpen && (
         <form className="inline-panel" onSubmit={addWalkIn}>
           <div className="contact-hint">

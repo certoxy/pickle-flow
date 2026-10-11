@@ -817,10 +817,20 @@ select:focus {
 }
 .roster-toolbar {
   display: grid;
-  grid-template-columns: minmax(190px, 1fr) auto auto auto;
+  grid-template-columns: minmax(190px, 1fr) auto auto auto auto;
   gap: 9px;
   align-items: center;
 }
+.import-file-button { position: relative; cursor: pointer; }
+.import-file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.import-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.import-heading h3 { margin: 0; }
+.import-heading p { margin: 5px 0 0; }
+.import-preview { max-height: 350px; margin: 14px 0; overflow: auto; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+.import-preview .player-table { min-width: 680px; }
+.import-status { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: .72rem; font-weight: 800; }
+.import-status.valid { color: #41630a; background: #eef9d8; }
+.import-status.invalid { color: #9f2f2f; background: #fff0ed; }
 .search-field {
   position: relative;
   display: block;
