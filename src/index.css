@@ -817,7 +817,7 @@ select:focus {
 }
 .roster-toolbar {
   display: grid;
-  grid-template-columns: minmax(190px, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(190px, 1fr) repeat(5, auto);
   gap: 9px;
   align-items: center;
 }
