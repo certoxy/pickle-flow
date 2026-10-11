@@ -95,7 +95,7 @@ function Header({ session, onSignOut }) {
   );
 }
 
-function Landing({ onStart }) {
+function Landing({ onStart, onLogin }) {
   const donationUrl = import.meta.env.VITE_DONATION_URL;
   return (
     <>
@@ -114,6 +114,9 @@ function Landing({ onStart }) {
               <button className="button button-primary" onClick={onStart}>
                 Register as an organizer
               </button>
+              <button className="button button-secondary" onClick={onLogin}>
+                Log in
+              </button>
               <a className="button button-secondary" href="#about">
                 See how it works
               </a>
@@ -131,22 +134,72 @@ function Landing({ onStart }) {
             </div>
           </div>
         </section>
-        <section className="feature-grid" id="about">
-          <article>
-            <Users />
-            <h3>Organizer accounts</h3>
-            <p>Keep club and contact information in one secure place.</p>
-          </article>
-          <article>
-            <CalendarDays />
-            <h3>Create events</h3>
-            <p>Set the date, venue, start time, and player capacity.</p>
-          </article>
-          <article>
-            <Trophy />
-            <h3>Register players</h3>
-            <p>Share one simple link—players do not need an account.</p>
-          </article>
+        <section className="about-section" id="about">
+          <div className="about-heading">
+            <span className="eyebrow">From registration to final score</span>
+            <h2>One simple flow for the whole event.</h2>
+            <p>
+              PickleFlow gives organizers a single place to prepare the event,
+              manage players, run open play, and keep everyone informed in real time.
+            </p>
+          </div>
+          <div className="feature-grid">
+            <article>
+              <span className="feature-number">01</span>
+              <CalendarDays />
+              <h3>Create and share</h3>
+              <p>Set the schedule, venue, player limit, and share one registration link or QR code.</p>
+            </article>
+            <article>
+              <span className="feature-number">02</span>
+              <Users />
+              <h3>Build the player list</h3>
+              <p>Accept signups, add walk-ins, import a CSV, check players in, and manage the queue.</p>
+            </article>
+            <article>
+              <span className="feature-number">03</span>
+              <Trophy />
+              <h3>Run game day live</h3>
+              <p>Assign matches by court, score from a phone, and update the shared Match Board automatically.</p>
+            </article>
+          </div>
+          <div className="product-showcase">
+            <article className="showcase-card">
+              <img src="/product-previews/event-roster.svg" alt="PickleFlow event roster and player management screen" />
+              <div>
+                <span>Organizer workspace</span>
+                <h3>Event and player management</h3>
+                <p>Keep event details, registrations, check-ins, imports, and exports together.</p>
+              </div>
+            </article>
+            <article className="showcase-card">
+              <img src="/product-previews/game-day.svg" alt="PickleFlow Game Day court and player queue screen" />
+              <div>
+                <span>Mobile game control</span>
+                <h3>Game Day operations</h3>
+                <p>See active courts, next matches, scores, substitutes, and waiting players at a glance.</p>
+              </div>
+            </article>
+            <article className="showcase-card">
+              <img src="/product-previews/match-board.svg" alt="PickleFlow smart TV Match Board screen" />
+              <div>
+                <span>Large-screen display</span>
+                <h3>Live Match Board</h3>
+                <p>Show court activity, scores, next matches, the queue, and recent winners on a smart TV.</p>
+              </div>
+            </article>
+          </div>
+          <div className="use-cases">
+            <div>
+              <span className="eyebrow">Designed for real play</span>
+              <h2>Use PickleFlow your way.</h2>
+            </div>
+            <div className="use-case-list">
+              <article><strong>Club open play</strong><span>Keep rotations fair and courts moving without a paper queue.</span></article>
+              <article><strong>Community events</strong><span>Collect player registrations and organize multiple courts from one phone.</span></article>
+              <article><strong>Private game days</strong><span>Share scorer access per court while the organizer keeps full control.</span></article>
+            </div>
+          </div>
         </section>
         <section className="donation-card">
           <div className="donation-icon">
@@ -186,8 +239,8 @@ function Landing({ onStart }) {
   );
 }
 
-function AuthPanel({ onClose }) {
-  const [mode, setMode] = useState("signup"),
+function AuthPanel({ onClose, initialMode = "signup" }) {
+  const [mode, setMode] = useState(initialMode),
     [form, setForm] = useState({ ...emptyProfile, email: "", password: "" }),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
@@ -1712,6 +1765,7 @@ function PublicRegistration({ code, onHome }) {
 export default function App() {
   const [session, setSession] = useState(null),
     [showAuth, setShowAuth] = useState(false),
+    [authMode, setAuthMode] = useState("signup"),
     [loading, setLoading] = useState(isSupabaseConfigured);
   const eventCode = new URLSearchParams(window.location.search).get("event");
   const scoringToken = new URLSearchParams(window.location.search).get("score");
@@ -1756,9 +1810,24 @@ export default function App() {
       ) : session ? (
         <Dashboard session={session} />
       ) : (
-        <Landing onStart={() => setShowAuth(true)} />
+        <Landing
+          onStart={() => {
+            setAuthMode("signup");
+            setShowAuth(true);
+          }}
+          onLogin={() => {
+            setAuthMode("signin");
+            setShowAuth(true);
+          }}
+        />
       )}
-      {!session && showAuth && <AuthPanel onClose={() => setShowAuth(false)} />}
+      {!session && showAuth && (
+        <AuthPanel
+          key={authMode}
+          initialMode={authMode}
+          onClose={() => setShowAuth(false)}
+        />
+      )}
     </div>
   );
 }
