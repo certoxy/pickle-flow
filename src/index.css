@@ -720,6 +720,58 @@ select:focus {
 .event-form-card {
   max-width: 760px;
 }
+.location-picker {
+  margin: 18px 0 24px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #f7fafc;
+}
+.location-picker-heading,
+.location-picker-footer,
+.registration-location-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.location-picker-heading { margin-bottom: 12px; }
+.location-picker-heading strong,
+.location-picker-heading span,
+.registration-location-heading strong,
+.registration-location-heading span { display: block; }
+.location-picker-heading span,
+.registration-location-heading span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .8rem;
+}
+.location-map {
+  width: 100%;
+  height: 340px;
+  overflow: hidden;
+  border-radius: 13px;
+  background: #dfe9ef;
+}
+.location-picker-footer { margin-top: 10px; color: var(--muted); font-size: .78rem; }
+.location-picker-footer a { color: var(--blue); font-weight: 800; }
+.registration-location {
+  margin-top: 24px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.34);
+  border-radius: 18px;
+  background: rgba(255,255,255,.12);
+}
+.registration-location-heading { margin-bottom: 12px; }
+.registration-location-heading span { color: rgba(255,255,255,.72); }
+.registration-location iframe {
+  width: 100%;
+  height: 260px;
+  display: block;
+  border: 0;
+  border-radius: 13px;
+}
+.event-meta a { display: flex; align-items: center; gap: 8px; color: inherit; text-decoration: none; }
 .event-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1719,6 +1771,14 @@ select:focus {
   .form-row {
     grid-template-columns: 1fr;
   }
+  .location-picker-heading,
+  .location-picker-footer,
+  .registration-location-heading { align-items: stretch; flex-direction: column; }
+  .location-picker-heading .button,
+  .registration-location-heading .button { width: 100%; }
+  .location-map { height: 280px; }
+  .registration-location { padding: 10px; }
+  .registration-location iframe { height: 220px; }
   .auth-card {
     padding: 28px 20px;
   }
