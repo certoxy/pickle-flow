@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   CheckCircle2,
@@ -8,7 +8,9 @@ import {
   Heart,
   FileUp,
   LogOut,
+  LocateFixed,
   MapPin,
+  Phone,
   Plus,
   Search,
   ShieldCheck,
@@ -18,6 +20,8 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -40,6 +44,9 @@ const emptyEvent = {
   event_date: "",
   start_time: "",
   registration_limit: 32,
+  organizer_contact_phone: "",
+  location_lat: null,
+  location_lng: null,
   status: "open",
 };
 const emptyPlayer = {
@@ -452,10 +459,71 @@ function TermsStep({ onAccept, onCancel }) {
   );
 }
 
+function LocationPicker({ latitude, longitude, onChange }) {
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markerRef = useRef(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    const hasPin = latitude !== null && latitude !== "" && longitude !== null && longitude !== "" && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude));
+    const center = hasPin ? [Number(latitude), Number(longitude)] : [9.85, 124.14];
+    const map = L.map(containerRef.current, { scrollWheelZoom: false }).setView(center, hasPin ? 16 : 10);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+    const placePin = (lat, lng) => {
+      if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
+      else markerRef.current = L.circleMarker([lat, lng], {
+        radius: 10, color: "#fff", weight: 4, fillColor: "#2375d8", fillOpacity: 1,
+      }).addTo(map);
+    };
+    if (hasPin) placePin(Number(latitude), Number(longitude));
+    map.on("click", ({ latlng }) => {
+      placePin(latlng.lat, latlng.lng);
+      onChangeRef.current(latlng.lat, latlng.lng);
+    });
+    mapRef.current = map;
+    setTimeout(() => map.invalidateSize(), 0);
+    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+  }, []);
+  function useCurrentLocation() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      const lat = coords.latitude, lng = coords.longitude;
+      if (markerRef.current) markerRef.current.setLatLng([lat, lng]);
+      else markerRef.current = L.circleMarker([lat, lng], {
+        radius: 10, color: "#fff", weight: 4, fillColor: "#2375d8", fillOpacity: 1,
+      }).addTo(mapRef.current);
+      mapRef.current.setView([lat, lng], 17);
+      onChange(lat, lng);
+    });
+  }
+  const hasPin = latitude !== null && latitude !== "" && longitude !== null && longitude !== "" && Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude));
+  return (
+    <div className="location-picker">
+      <div className="location-picker-heading">
+        <div><strong>Pin the event location</strong><span>Tap the exact court or venue on the map.</span></div>
+        <button type="button" className="button button-secondary" onClick={useCurrentLocation}>
+          <LocateFixed size={16} /> Use my location
+        </button>
+      </div>
+      <div ref={containerRef} className="location-map" aria-label="Event location map selector" />
+      <div className="location-picker-footer">
+        <span>{hasPin ? `Pinned at ${Number(latitude).toFixed(5)}, ${Number(longitude).toFixed(5)}` : "No location pinned yet."}</span>
+        {hasPin && <a href={`https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`} target="_blank" rel="noreferrer">Open in Google Maps</a>}
+      </div>
+    </div>
+  );
+}
+
 function EventForm({
   onSaved,
   onCancel,
   defaultCity,
+  organizerPhone,
   termsAcceptedAt,
   initialEvent,
 }) {
@@ -467,7 +535,7 @@ function EventForm({
             ...initialEvent,
             start_time: initialEvent.start_time?.slice(0, 5) || "",
           }
-        : { ...emptyEvent, city: defaultCity || "" },
+        : { ...emptyEvent, city: defaultCity || "", organizer_contact_phone: organizerPhone || "" },
     ),
     [message, setMessage] = useState(""),
     [busy, setBusy] = useState(false);
@@ -489,6 +557,9 @@ function EventForm({
       registration_limit: form.registration_limit
         ? Number(form.registration_limit)
         : null,
+      organizer_contact_phone: form.organizer_contact_phone.trim(),
+      location_lat: form.location_lat === null || form.location_lat === "" ? null : Number(form.location_lat),
+      location_lng: form.location_lng === null || form.location_lng === "" ? null : Number(form.location_lng),
       status: form.status,
     };
     if (!editing)
@@ -548,6 +619,17 @@ function EventForm({
             placeholder="Club or court name"
           />
         </label>
+        <label>
+          Organizer contact phone
+          <input
+            required
+            type="tel"
+            name="organizer_contact_phone"
+            value={form.organizer_contact_phone || ""}
+            onChange={update}
+            placeholder="Number players can call about this event"
+          />
+        </label>
         <div className="form-row">
           <label>
             City
@@ -564,6 +646,11 @@ function EventForm({
             />
           </label>
         </div>
+        <LocationPicker
+          latitude={form.location_lat}
+          longitude={form.location_lng}
+          onChange={(location_lat, location_lng) => setForm({ ...form, location_lat, location_lng })}
+        />
         <div className="form-row">
           <label>
             Event date
@@ -1498,6 +1585,7 @@ function Dashboard({ session }) {
       {view === "new" && (
         <EventForm
           defaultCity={profile.city}
+          organizerPhone={profile.phone}
           termsAcceptedAt={termsAcceptedAt}
           onSaved={(item) => {
             setEvents([item, ...events]);
@@ -1513,6 +1601,7 @@ function Dashboard({ session }) {
       {view === "edit" && selectedEvent && (
         <EventForm
           initialEvent={selectedEvent}
+          organizerPhone={profile.phone}
           onSaved={(item) => {
             replaceEvent(item);
             setView("players");
@@ -1686,6 +1775,11 @@ function PublicRegistration({ code, onHome }) {
             <MapPin size={17} /> {event.venue}
             {event.city ? `, ${event.city}` : ""}
           </span>
+          {event.organizer_contact_phone && (
+            <a href={`tel:${event.organizer_contact_phone}`}>
+              <Phone size={17} /> Organizer: {event.organizer_contact_phone}
+            </a>
+          )}
           <span>
             <Users size={17} />{" "}
             {spots === null
@@ -1693,6 +1787,22 @@ function PublicRegistration({ code, onHome }) {
               : `${spots} spot${spots === 1 ? "" : "s"} remaining`}
           </span>
         </div>
+        {event.location_lat && event.location_lng && (
+          <div className="registration-location">
+            <div className="registration-location-heading">
+              <div><strong>Pinned event location</strong><span>Use the preview or open the pin for directions.</span></div>
+              <a className="button button-secondary" href={`https://www.google.com/maps/search/?api=1&query=${event.location_lat},${event.location_lng}`} target="_blank" rel="noreferrer">
+                <MapPin size={16} /> Open in Google Maps
+              </a>
+            </div>
+            <iframe
+              title="Pinned event location preview"
+              src={`https://www.google.com/maps?q=${event.location_lat},${event.location_lng}&z=16&output=embed`}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+          </div>
+        )}
       </section>
       <section className="auth-card registration-card">
         {success ? (
