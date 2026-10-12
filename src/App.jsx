@@ -90,17 +90,45 @@ function parseCsv(text) {
 }
 
 function Header({ session, onSignOut }) {
+  const [showDonationPrompt, setShowDonationPrompt] = useState(false);
+
+  function finishSignOut(donate = false) {
+    if (donate) window.open("/donate", "_blank", "noopener,noreferrer");
+    setShowDonationPrompt(false);
+    onSignOut?.();
+  }
+
   return (
-    <header className="topbar">
-      <a className="brand" href="/" aria-label="PickleFlow home">
-        <img src="/brand/pickleflow-logo.png" alt="PickleFlow" />
-      </a>
-      {session && (
-        <button className="button button-ghost" onClick={onSignOut}>
-          <LogOut size={17} /> Sign out
-        </button>
+    <>
+      <header className="topbar">
+        <a className="brand" href="/" aria-label="PickleFlow home">
+          <img src="/brand/pickleflow-logo.png" alt="PickleFlow" />
+        </a>
+        <div className="topbar-actions">
+          <a className="button button-donate" href="/donate" aria-label="Donate to PickleFlow"><Heart size={17} /> Donate</a>
+          {session && (
+            <button className="button button-ghost" aria-label="Sign out" onClick={() => setShowDonationPrompt(true)}>
+              <LogOut size={17} /> Sign out
+            </button>
+          )}
+        </div>
+      </header>
+      {showDonationPrompt && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setShowDonationPrompt(false)}>
+          <section className="logout-donation-dialog" role="dialog" aria-modal="true" aria-labelledby="logout-donation-title" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="donation-icon"><Heart /></div>
+            <span className="eyebrow">Before you go</span>
+            <h2 id="logout-donation-title">Would you like to support PickleFlow?</h2>
+            <p>Your optional donation helps keep PickleFlow free for organizers and supports future improvements.</p>
+            <div className="logout-donation-actions">
+              <button className="button button-donate" onClick={() => finishSignOut(true)}><Heart size={17} /> Donate and sign out</button>
+              <button className="button button-secondary" onClick={() => finishSignOut(false)}>Not now, sign out</button>
+              <button className="logout-cancel" onClick={() => setShowDonationPrompt(false)}>Cancel</button>
+            </div>
+          </section>
+        </div>
       )}
-    </header>
+    </>
   );
 }
 
@@ -250,7 +278,7 @@ function DonationPage() {
       name: "GCash",
       number: "0917 671 0751",
       copyValue: "09176710751",
-      image: "/donations/gcash-qr.jpeg",
+      image: "/donations/gcash-qr.png",
       className: "wallet-gcash",
     },
     {
@@ -258,7 +286,7 @@ function DonationPage() {
       name: "Maya",
       number: "0998 537 8242",
       copyValue: "09985378242",
-      image: "/donations/maya-qr.jpeg",
+      image: "/donations/maya-qr.png",
       className: "wallet-maya",
     },
   ];
@@ -304,7 +332,6 @@ function DonationPage() {
             <div className="wallet-qr-wrap">
               <img src={wallet.image} alt={`${wallet.name} QR code for PickleFlow donations`} />
             </div>
-            <strong className="recipient-name">Glenn Ocay</strong>
             <div className="wallet-number">
               <span>{wallet.number}</span>
               <button type="button" onClick={() => copyNumber(wallet.name, wallet.copyValue)}>
@@ -320,8 +347,7 @@ function DonationPage() {
         <ShieldCheck size={22} />
         <p>
           Donations are optional and do not unlock additional features. Payments
-          are handled directly by PayPal, GCash, or Maya. Before sending, please
-          verify that the recipient is <strong>Glenn Ocay</strong>.
+          are handled directly by PayPal, GCash, or Maya.
         </p>
       </section>
     </main>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clock3, Trophy, Users, Volume2, VolumeX } from "lucide-react";
+import { Clock3, Heart, Trophy, Users, Volume2, VolumeX } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
 const names = (list = []) => list.join(" · ");
@@ -77,7 +77,7 @@ export default function MatchBoard({ token }) {
     <header className="tv-header">
       <div><span className="tv-live-dot" /> LIVE MATCH BOARD</div>
       <section><h1>{board.event_name}</h1><p>{board.venue || "PickleFlow Game Day"}</p></section>
-      <aside><time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><button className={announcementsEnabled ? "enabled" : ""} onClick={toggleAnnouncements}>{announcementsEnabled ? <Volume2 /> : <VolumeX />}<span>{announcementsEnabled ? "Voice on" : "Enable voice"}</span></button></aside>
+      <aside><time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><div className="tv-header-actions"><a href="/donate" target="_blank" rel="noreferrer"><Heart /><span>Donate</span></a><button className={announcementsEnabled ? "enabled" : ""} onClick={toggleAnnouncements}>{announcementsEnabled ? <Volume2 /> : <VolumeX />}<span>{announcementsEnabled ? "Voice on" : "Enable voice"}</span></button></div></aside>
     </header>
     <section className="tv-courts">
       {board.courts.map((court) => <article className={`tv-court ${court.game ? "playing" : "idle"}`} key={court.id}>
