@@ -415,6 +415,14 @@ function Landing({ onStart, onLogin }) {
 function DonationPage() {
   const [copied, setCopied] = useState("");
 
+  async function sharePickleFlow() {
+    const share = { title: "PickleFlow", text: "Run smoother pickleball events with PickleFlow.", url: "https://pickleflow.paotechs.com/" };
+    if (navigator.share) return navigator.share(share).catch(() => {});
+    await navigator.clipboard?.writeText(share.url);
+    setCopied("share");
+    window.setTimeout(() => setCopied(""), 1800);
+  }
+
   async function copyNumber(provider, number) {
     try {
       await navigator.clipboard.writeText(number);
@@ -494,6 +502,10 @@ function DonationPage() {
           Donations are optional and do not unlock additional features. Payments
           are handled directly by PayPal, GCash, or Maya.
         </p>
+      </section>
+      <section className="donation-promo">
+        <div><span className="eyebrow">Grow the community</span><h2>Know another pickleball organizer?</h2><p>Share PickleFlow and help more clubs run registration, queues, scoring, and match boards from one place.</p></div>
+        <button className="button button-primary" type="button" onClick={sharePickleFlow}>{copied === "share" ? <CheckCircle2 size={17} /> : <Sparkles size={17} />}{copied === "share" ? "Link copied" : "Share PickleFlow"}</button>
       </section>
     </main>
   );
@@ -599,13 +611,19 @@ function PayPalDonationCheckout({
 }
 
 const ACTIVE_EVENT_PACKAGES = [
-  { events: 2, amount: 10 },
-  { events: 5, amount: 25 },
-  { events: 10, amount: 50 },
+  { events: 2, amount: 10, pesoAmount: 580 },
+  { events: 5, amount: 25, pesoAmount: 1450 },
+  { events: 10, amount: 50, pesoAmount: 2900 },
 ];
+
+const LOCAL_PAYMENT_METHODS = {
+  gcash: { name: "GCash", number: "0917 671 0751", copyValue: "09176710751", image: "/donations/gcash-qr.png" },
+  maya: { name: "Maya", number: "0998 537 8242", copyValue: "09985378242", image: "/donations/maya-qr.png" },
+};
 
 function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
   const [selected, setSelected] = useState(ACTIVE_EVENT_PACKAGES[0]);
+  const [paymentProvider, setPaymentProvider] = useState("paypal");
   const [donation, setDonation] = useState(null);
   const [proofMethod, setProofMethod] = useState("upload");
   const [proof, setProof] = useState(null);
@@ -614,7 +632,7 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
 
   async function submit() {
     if (!donation || busy) return;
-    if (proofMethod === "upload" && !proof) return setMessage("Upload your PayPal receipt or payment confirmation.");
+    if (proofMethod === "upload" && !proof) return setMessage(`Upload your ${paymentProvider === "paypal" ? "PayPal receipt" : `${LOCAL_PAYMENT_METHODS[paymentProvider].name} payment confirmation`}.`);
     setBusy(true); setMessage("");
     let proofPath = null;
     if (proofMethod === "upload") {
@@ -628,19 +646,23 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
       organizer_user_id: session.user.id,
       requested_events: selected.events,
       donation_amount_usd: selected.amount,
-      paypal_order_id: donation.orderId,
-      paypal_capture_id: donation.captureId,
+      donation_amount_php: paymentProvider === "paypal" ? null : selected.pesoAmount,
+      payment_provider: paymentProvider,
+      payment_reference: donation.orderId || null,
+      paypal_order_id: paymentProvider === "paypal" ? donation.orderId : null,
+      paypal_capture_id: paymentProvider === "paypal" ? donation.captureId : null,
       proof_method: proofMethod,
       proof_path: proofPath,
     });
     setBusy(false);
     if (error) return setMessage(error.message);
     if (proofMethod === "email") {
-      const subject = encodeURIComponent(`PickleFlow donation proof – ${selected.events} additional events`);
-      const body = encodeURIComponent(`Please attach the PayPal proof for order ${donation.orderId}.\n\nOrganizer account: ${session.user.email}`);
+      const providerName = paymentProvider === "paypal" ? "PayPal" : LOCAL_PAYMENT_METHODS[paymentProvider].name;
+      const subject = encodeURIComponent(`PickleFlow payment proof | +${selected.events} active events`);
+      const body = encodeURIComponent(`Hello PickleFlow Support,\n\nI am submitting my ${providerName} payment proof for +${selected.events} active events.\n\nPackage: +${selected.events} active events\nAmount: ${paymentProvider === "paypal" ? `$${selected.amount} USD` : `₱${selected.pesoAmount.toLocaleString()} PHP`}\nOrganizer account: ${session.user.email}\n${donation.orderId ? `Payment reference: ${donation.orderId}\n` : ""}\nPlease attach the receipt or payment screenshot before sending.\n\nThank you,\nPickleFlow Organizer`);
       window.location.href = `mailto:hello@paotechs.com?subject=${subject}&body=${body}`;
     }
-    setMessage("Request submitted for Platform Admin approval.");
+    setMessage("Your request is in the PickleFlow approval queue. We’ll review the payment proof and update your active-event allowance.");
     onSubmitted?.();
   }
 
@@ -648,24 +670,32 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
     <button className="text-button compact" onClick={onBack}><ArrowLeft size={16} /> Back to events</button>
     <span className="eyebrow">Increase your event allowance</span>
     <h2>Support PickleFlow and run more active events</h2>
-    <p className="muted">Select a package, complete the PayPal donation, then upload or email your proof. Additional events are available after administrator approval.</p>
+    <p className="muted">Select a package, pay securely through PayPal, GCash, or Maya, then send your proof. Additional events become available after Platform Admin approval.</p>
     <div className="upgrade-steps"><span><b>1</b> Select a package and donate</span><span><b>2</b> Upload or email your proof</span><span><b>3</b> Admin approves your allowance</span></div>
     <div className="upgrade-packages">
       {ACTIVE_EVENT_PACKAGES.map((item) => <button type="button" key={item.events} className={selected.events === item.events ? "selected" : ""} onClick={() => { setSelected(item); setDonation(null); }}>
-        <strong>+{item.events}</strong><span>active events</span><b>${item.amount}</b>
+        <strong>+{item.events}</strong><span>active events</span><b>${item.amount} / ₱{item.pesoAmount.toLocaleString()}</b>
       </button>)}
       <a className="custom-package" href="mailto:hello@paotechs.com?subject=PickleFlow custom active event allowance"><strong>Custom</strong><span>active events</span><b>Contact support</b></a>
     </div>
-    {!donation ? <PayPalDonationCheckout key={selected.events} minimum={selected.amount} initialAmount={`${selected.amount}.00`} amounts={[`${selected.amount}.00`]} description={`PickleFlow +${selected.events} active events`} onSuccess={setDonation} fixedAmount /> : <>
-      <div className="suggestion-confirmed"><CheckCircle2 /><span>PayPal donation confirmed.</span></div>
-      <div className="proof-heading"><span className="eyebrow">Step 2</span><h3>Send your proof of payment</h3><p>Upload the PayPal receipt below, or choose Email proof to attach it from your email app.</p></div>
+    <div className="upgrade-payment-methods" role="group" aria-label="Payment method">
+      {[{ id: "paypal", name: "PayPal", detail: "USD · online checkout" }, { id: "gcash", name: "GCash", detail: "PHP · scan or send" }, { id: "maya", name: "Maya", detail: "PHP · scan or send" }].map((method) => <button type="button" key={method.id} className={paymentProvider === method.id ? "selected" : ""} onClick={() => { setPaymentProvider(method.id); setDonation(null); setMessage(""); }}><b>{method.name}</b><span>{method.detail}</span></button>)}
+    </div>
+    {!donation && paymentProvider === "paypal" && <PayPalDonationCheckout key={selected.events} minimum={selected.amount} initialAmount={`${selected.amount}.00`} amounts={[`${selected.amount}.00`]} description={`PickleFlow +${selected.events} active events`} onSuccess={setDonation} fixedAmount />}
+    {!donation && paymentProvider !== "paypal" && (() => { const wallet = LOCAL_PAYMENT_METHODS[paymentProvider]; return <div className="upgrade-wallet-checkout">
+      <div className="upgrade-wallet-qr"><img src={wallet.image} alt={`${wallet.name} QR code for PickleFlow`} /></div>
+      <div><span className="eyebrow">Pay with {wallet.name}</span><h3>Send ₱{selected.pesoAmount.toLocaleString()}</h3><p>Scan the QR code or send to the mobile number below. Save the receipt—you’ll submit it in the next step.</p><div className="wallet-number"><span>{wallet.number}</span><button type="button" onClick={() => navigator.clipboard?.writeText(wallet.copyValue)}><Copy size={16} /> Copy</button></div><button className="button button-primary" type="button" onClick={() => setDonation({ provider: paymentProvider })}>I’ve sent the payment</button></div>
+    </div>; })()}
+    {donation && <>
+      <div className="suggestion-confirmed"><CheckCircle2 /><span>{paymentProvider === "paypal" ? "PayPal donation confirmed." : `${LOCAL_PAYMENT_METHODS[paymentProvider].name} payment marked as sent.`}</span></div>
+      <div className="proof-heading"><span className="eyebrow">Step 2</span><h3>Send your proof of payment</h3><p>Upload your receipt below, or choose Email proof to attach it from your email app.</p></div>
       <div className="proof-methods">
         <label><input type="radio" checked={proofMethod === "upload"} onChange={() => setProofMethod("upload")} /> Upload proof</label>
         <label><input type="radio" checked={proofMethod === "email"} onChange={() => setProofMethod("email")} /> Email proof</label>
       </div>
-      {proofMethod === "upload" && <label className="proof-upload"><FileUp size={20} /><span>{proof?.name || "Choose PayPal receipt (image or PDF, up to 5 MB)"}</span><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(event) => setProof(event.target.files?.[0] || null)} /></label>}
-      {proofMethod === "email" && <p className="form-note">After submitting, your email app will open with the order details. Attach the PayPal receipt before sending.</p>}
-      {message && <div className={`form-message ${message.startsWith("Request submitted") ? "" : "error"}`}>{message}</div>}
+      {proofMethod === "upload" && <label className="proof-upload"><FileUp size={20} /><span>{proof?.name || `Choose ${paymentProvider === "paypal" ? "PayPal" : LOCAL_PAYMENT_METHODS[paymentProvider].name} receipt (image or PDF, up to 5 MB)`}</span><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(event) => setProof(event.target.files?.[0] || null)} /></label>}
+      {proofMethod === "email" && <p className="form-note">After submitting, your email app will open with a PickleFlow-formatted message. Attach the receipt before sending.</p>}
+      {message && <div className={`form-message ${message.startsWith("Your request") ? "" : "error"}`}>{message}</div>}
       <button className="button button-primary button-full" disabled={busy} onClick={submit}>{busy ? "Submitting…" : "Submit for approval"}</button>
     </>}
   </section>;
@@ -2306,8 +2336,8 @@ function PlatformAdminPage({ session, onLogin }) {
     <section className="profile-card">
       <div className="section-title"><div><span className="eyebrow">Upgrade requests</span><h2>Review queue</h2></div></div>
       {!requests.length ? <div className="empty-state"><CheckCircle2 size={36} /><h3>No requests yet</h3><p>Submitted donation proofs will appear here.</p></div> : <div className="admin-request-list">{requests.map((item) => <article key={item.id}>
-        <div><span className={`status-badge ${item.status}`}>{item.status}</span><h3>+{item.requested_events} active events</h3><p>${Number(item.donation_amount_usd).toFixed(2)} · {new Date(item.created_at).toLocaleString()}</p><small>Organizer: {item.organizer_user_id}</small><small>PayPal order: {item.paypal_order_id}</small></div>
-        <div className="admin-request-actions">{item.proof_method === "upload" ? <button className="button button-secondary" onClick={() => viewProof(item.proof_path)}>View proof</button> : <a className="button button-secondary" href={`mailto:hello@paotechs.com?subject=PickleFlow proof ${item.paypal_order_id}`}>Check emailed proof</a>}{item.status === "pending" && <><button className="button button-primary" onClick={() => review(item, true)}>Approve</button><button className="button button-secondary" onClick={() => review(item, false)}>Decline</button></>}</div>
+        <div><span className={`status-badge ${item.status}`}>{item.status}</span><span className="payment-provider-badge">{(item.payment_provider || "paypal").toUpperCase()}</span><h3>+{item.requested_events} active events</h3><p>{item.payment_provider && item.payment_provider !== "paypal" ? `₱${Number(item.donation_amount_php).toLocaleString()} PHP` : `$${Number(item.donation_amount_usd).toFixed(2)} USD`} · {new Date(item.created_at).toLocaleString()}</p><small>Organizer: {item.organizer_user_id}</small>{(item.payment_reference || item.paypal_order_id) && <small>Payment reference: {item.payment_reference || item.paypal_order_id}</small>}</div>
+        <div className="admin-request-actions">{item.proof_method === "upload" ? <button className="button button-secondary" onClick={() => viewProof(item.proof_path)}>View proof</button> : <a className="button button-secondary" href={`mailto:hello@paotechs.com?subject=PickleFlow proof ${item.payment_reference || item.paypal_order_id || item.id}`}>Check emailed proof</a>}{item.status === "pending" && <><button className="button button-primary" onClick={() => review(item, true)}>Approve</button><button className="button button-secondary" onClick={() => review(item, false)}>Decline</button></>}</div>
       </article>)}</div>}
     </section>
   </main>;
