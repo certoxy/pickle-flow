@@ -369,6 +369,7 @@ function PayPalDonationCheckout({
   amounts = ["1.00", "5.00", "10.00"],
   description = "Support PickleFlow development and hosting",
   onSuccess,
+  fixedAmount = false,
 }) {
   const [amount, setAmount] = useState(initialAmount);
   const [customAmount, setCustomAmount] = useState("");
@@ -428,8 +429,8 @@ function PayPalDonationCheckout({
   }, [description, minimum, onSuccess, selectedAmount, validAmount]);
 
   return (
-    <div className="paypal-checkout-layout">
-      <div className="paypal-amount-panel">
+    <div className={`paypal-checkout-layout ${fixedAmount ? "fixed-amount" : ""}`}>
+      {!fixedAmount && <div className="paypal-amount-panel">
         <p>Choose an amount. PayPal will show any applicable currency conversion during checkout.</p>
         <div className="paypal-amounts" role="group" aria-label="Donation amount">
           {amounts.map((value) => (
@@ -444,7 +445,7 @@ function PayPalDonationCheckout({
           </label>
         )}
         {!validAmount && amount === "custom" && <small className="paypal-validation">Enter an amount from ${minimum} to $1,000.</small>}
-      </div>
+      </div>}
       <div className="paypal-button-panel">
         <strong>Donate ${validAmount ? selectedAmount.toFixed(2) : "0.00"} USD</strong>
         {PAYPAL_CLIENT_ID ? (
@@ -510,13 +511,16 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
     <span className="eyebrow">Increase your event allowance</span>
     <h2>Support PickleFlow and run more active events</h2>
     <p className="muted">Select a package, complete the PayPal donation, then upload or email your proof. Additional events are available after administrator approval.</p>
+    <div className="upgrade-steps"><span><b>1</b> Select a package and donate</span><span><b>2</b> Upload or email your proof</span><span><b>3</b> Admin approves your allowance</span></div>
     <div className="upgrade-packages">
       {ACTIVE_EVENT_PACKAGES.map((item) => <button type="button" key={item.events} className={selected.events === item.events ? "selected" : ""} onClick={() => { setSelected(item); setDonation(null); }}>
         <strong>+{item.events}</strong><span>active events</span><b>${item.amount}</b>
       </button>)}
+      <a className="custom-package" href="mailto:hello@paotechs.com?subject=PickleFlow custom active event allowance"><strong>Custom</strong><span>active events</span><b>Contact support</b></a>
     </div>
-    {!donation ? <PayPalDonationCheckout minimum={selected.amount} initialAmount={`${selected.amount}.00`} amounts={[`${selected.amount}.00`]} description={`PickleFlow +${selected.events} active events`} onSuccess={setDonation} /> : <>
-      <div className="suggestion-confirmed"><CheckCircle2 /><span>PayPal donation confirmed. Choose how to send your proof.</span></div>
+    {!donation ? <PayPalDonationCheckout key={selected.events} minimum={selected.amount} initialAmount={`${selected.amount}.00`} amounts={[`${selected.amount}.00`]} description={`PickleFlow +${selected.events} active events`} onSuccess={setDonation} fixedAmount /> : <>
+      <div className="suggestion-confirmed"><CheckCircle2 /><span>PayPal donation confirmed.</span></div>
+      <div className="proof-heading"><span className="eyebrow">Step 2</span><h3>Send your proof of payment</h3><p>Upload the PayPal receipt below, or choose Email proof to attach it from your email app.</p></div>
       <div className="proof-methods">
         <label><input type="radio" checked={proofMethod === "upload"} onChange={() => setProofMethod("upload")} /> Upload proof</label>
         <label><input type="radio" checked={proofMethod === "email"} onChange={() => setProofMethod("email")} /> Email proof</label>
@@ -526,7 +530,6 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
       {message && <div className={`form-message ${message.startsWith("Request submitted") ? "" : "error"}`}>{message}</div>}
       <button className="button button-primary button-full" disabled={busy} onClick={submit}>{busy ? "Submitting…" : "Submit for approval"}</button>
     </>}
-    <p className="custom-upgrade">Need a custom number of active events? <a href="mailto:hello@paotechs.com?subject=PickleFlow custom active event allowance">Contact support</a>.</p>
   </section>;
 }
 
