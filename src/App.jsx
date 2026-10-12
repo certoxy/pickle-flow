@@ -716,7 +716,7 @@ function SuggestionPage({ session, onLogin }) {
     setSubmitting(true);
     setMessage("");
     let proofPath = null;
-    if (paymentProvider !== "paypal") {
+    if (paymentProvider !== "paypal" && paymentProvider !== "later") {
       if (!walletProof) { setSubmitting(false); return setMessage("Upload your payment receipt before submitting."); }
       if (walletProof.size > 5 * 1024 * 1024) { setSubmitting(false); return setMessage("Proof must be 5 MB or smaller."); }
       const safeName = walletProof.name.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -730,7 +730,7 @@ function SuggestionPage({ session, onLogin }) {
       title: form.title.trim(),
       details: form.details.trim(),
       donation_amount_usd: paymentProvider === "paypal" ? donation.amount : null,
-      donation_amount_php: paymentProvider === "paypal" ? null : donation.amountPhp,
+      donation_amount_php: paymentProvider === "gcash" || paymentProvider === "maya" ? donation.amountPhp : null,
       payment_provider: paymentProvider,
       payment_reference: donation.orderId || null,
       payment_proof_path: proofPath,
@@ -750,7 +750,7 @@ function SuggestionPage({ session, onLogin }) {
         <div className="donate-heart"><MessageSquarePlus size={28} /></div>
         <span className="eyebrow">Help shape PickleFlow</span>
         <h1>Suggest an app improvement.</h1>
-        <p>Improvement requests are opened after a donation of at least $10 USD or ₱580 through PayPal, GCash, or Maya. Your support helps fund review, design, and continued development.</p>
+        <p>Share an idea now and support PickleFlow through PayPal, GCash, or Maya—or choose to donate later. Every suggestion enters the product backlog for review.</p>
       </section>
       {!session ? (
         <section className="suggest-card locked-suggestion">
@@ -776,10 +776,11 @@ function SuggestionPage({ session, onLogin }) {
             <div className="upgrade-wallet-qr"><img src={wallet.image} alt={`${wallet.name} QR code for PickleFlow`} /></div>
             <div className="suggest-wallet-details"><span className="eyebrow">Donate with {wallet.name}</span><h3>Scan or send to {wallet.number}</h3><div className="wallet-amounts" role="group" aria-label="Donation amount">{[580,1450,2900].map((amount) => <button type="button" key={amount} className={walletAmount === String(amount) ? "selected" : ""} onClick={() => setWalletAmount(String(amount))}>₱{amount.toLocaleString()}</button>)}<button type="button" className={!['580','1450','2900'].includes(walletAmount) ? "selected" : ""} onClick={() => setWalletAmount("")}>Custom</button></div><label>Donation amount (PHP)<input type="number" min="580" step="1" inputMode="numeric" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} /></label><label className="proof-upload"><FileUp size={20} /><span>{walletProof?.name || `Upload ${wallet.name} receipt (image or PDF, up to 5 MB)`}</span><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(event) => setWalletProof(event.target.files?.[0] || null)} /></label>{!validAmount && <small className="paypal-validation">The minimum donation is ₱580.</small>}<button className="button button-primary button-full" type="button" disabled={!validAmount || !walletProof} onClick={() => setDonation({ provider: paymentProvider, amountPhp: parsedAmount })}>Continue to suggestion</button></div>
           </div>; })()}
+          <div className="donate-later"><span>Not ready to donate today?</span><button className="text-button" type="button" onClick={() => { setPaymentProvider("later"); setDonation({ provider: "later" }); }}>I’ll Donate Later</button></div>
         </section>
       ) : (
         <section className="suggest-card suggestion-unlocked">
-          <div className="suggestion-confirmed"><CheckCircle2 /><span>{paymentProvider === "paypal" ? "PayPal donation confirmed." : `${LOCAL_PAYMENT_METHODS[paymentProvider].name} payment proof attached.`} Thank you for supporting PickleFlow.</span></div>
+          <div className={`suggestion-confirmed ${paymentProvider === "later" ? "donation-deferred" : ""}`}><CheckCircle2 /><span>{paymentProvider === "paypal" ? "PayPal donation confirmed. Thank you for supporting PickleFlow." : paymentProvider === "later" ? "Donation deferred. Your idea will still be added to the PickleFlow backlog." : `${LOCAL_PAYMENT_METHODS[paymentProvider].name} payment proof attached. Thank you for supporting PickleFlow.`}</span></div>
           <h2>Tell us what would make PickleFlow better</h2>
           <form onSubmit={submit}>
             <label>Suggestion type
@@ -2262,6 +2263,7 @@ function Dashboard({ session }) {
 function PlatformAdminPage({ session, onLogin }) {
   const [allowed, setAllowed] = useState(null);
   const [requests, setRequests] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
   const [organizers, setOrganizers] = useState([]);
   const [organizerSearch, setOrganizerSearch] = useState("");
   const [selectedOrganizerId, setSelectedOrganizerId] = useState(null);
@@ -2272,14 +2274,16 @@ function PlatformAdminPage({ session, onLogin }) {
     setAllowed(Boolean(admin));
     if (admin) {
       setLoading(true);
-      const [requestResult, organizerResult] = await Promise.all([
+      const [requestResult, organizerResult, suggestionResult] = await Promise.all([
         supabase.from("active_event_upgrade_requests").select("*").order("created_at", { ascending: false }),
         supabase.rpc("admin_organizer_activity"),
+        supabase.from("app_improvement_suggestions").select("*").order("created_at", { ascending: false }),
       ]);
-      if (requestResult.error || organizerResult.error) setMessage(requestResult.error?.message || organizerResult.error?.message);
+      if (requestResult.error || organizerResult.error || suggestionResult.error) setMessage(requestResult.error?.message || organizerResult.error?.message || suggestionResult.error?.message);
       else {
         setRequests(requestResult.data || []);
         setOrganizers(organizerResult.data || []);
+        setSuggestions(suggestionResult.data || []);
         setSelectedOrganizerId((current) => current || organizerResult.data?.[0]?.user_id || null);
       }
       setLoading(false);
@@ -2295,6 +2299,17 @@ function PlatformAdminPage({ session, onLogin }) {
   }
   async function viewProof(path) {
     const { data, error } = await supabase.storage.from("event-upgrade-proofs").createSignedUrl(path, 300);
+    if (error) setMessage(error.message); else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+  async function updateSuggestionStatus(id, status) {
+    setMessage("");
+    const { error } = await supabase.from("app_improvement_suggestions").update({ status }).eq("id", id);
+    if (error) return setMessage(error.message);
+    setSuggestions((current) => current.map((item) => item.id === id ? { ...item, status } : item));
+    setMessage(`Suggestion moved to ${status}.`);
+  }
+  async function viewSuggestionProof(path) {
+    const { data, error } = await supabase.storage.from("suggestion-payment-proofs").createSignedUrl(path, 300);
     if (error) setMessage(error.message); else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
   const filteredOrganizers = organizers.filter((organizer) => {
@@ -2316,7 +2331,7 @@ function PlatformAdminPage({ session, onLogin }) {
   if (allowed === null) return <main className="dashboard"><p>Checking administrator access…</p></main>;
   if (!allowed) return <main className="dashboard"><section className="profile-card admin-empty"><XCircle /><h1>Access denied</h1><p>This page is available only to PickleFlow platform administrators.</p><a className="button button-secondary" href="/">Return home</a></section></main>;
   return <main className="dashboard admin-page">
-    <section className="welcome-card"><span className="eyebrow"><ShieldCheck size={15} /> Platform Admin</span><h1>Platform activity</h1><p>Monitor organizers, events, player registrations, games, and active-event upgrade requests.</p></section>
+    <section className="welcome-card"><span className="eyebrow"><ShieldCheck size={15} /> Platform Admin</span><h1>Platform activity</h1><p>Monitor organizers, events, player registrations, games, suggestions, and active-event upgrade requests.</p></section>
     {message && <div className="form-message">{message}</div>}
     <section className="admin-summary-grid">
       <article><Users size={20} /><span>Organizers</span><strong>{organizers.length}</strong></article>
@@ -2354,6 +2369,13 @@ function PlatformAdminPage({ session, onLogin }) {
           </div>
         </article>}
       </div>}
+    </section>
+    <section className="profile-card admin-suggestions-card">
+      <div className="section-title"><div><span className="eyebrow">Product feedback</span><h2>Suggestion backlog</h2></div><span className="admin-count">{suggestions.length} submissions</span></div>
+      {!suggestions.length ? <div className="empty-state"><MessageSquarePlus size={36} /><h3>No suggestions yet</h3><p>Organizer submissions will appear here.</p></div> : <div className="admin-suggestion-list">{suggestions.map((item) => <article key={item.id}>
+        <div className="admin-suggestion-main"><div><span className={`status-badge ${item.status}`}>{item.status}</span><span className="payment-provider-badge">{item.payment_provider === "later" ? "DONATE LATER" : (item.payment_provider || "paypal").toUpperCase()}</span></div><h3>{item.title}</h3><p>{item.details}</p><small>{item.category} · {new Date(item.created_at).toLocaleString()}</small><small>Organizer: {item.organizer_user_id}</small>{item.payment_provider === "paypal" && <small>Donation: ${Number(item.donation_amount_usd).toFixed(2)} USD</small>}{["gcash","maya"].includes(item.payment_provider) && <small>Donation: ₱{Number(item.donation_amount_php).toLocaleString()} PHP</small>}</div>
+        <div className="admin-suggestion-actions">{item.payment_proof_path && <button className="button button-secondary" onClick={() => viewSuggestionProof(item.payment_proof_path)}>View proof</button>}<label>Status<select value={item.status} onChange={(event) => updateSuggestionStatus(item.id, event.target.value)}><option value="backlog">Backlog</option><option value="reviewing">Reviewing</option><option value="planned">Planned</option><option value="declined">Declined</option><option value="completed">Completed</option></select></label></div>
+      </article>)}</div>}
     </section>
     <section className="profile-card">
       <div className="section-title"><div><span className="eyebrow">Upgrade requests</span><h2>Review queue</h2></div></div>
