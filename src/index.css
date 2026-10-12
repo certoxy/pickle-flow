@@ -490,7 +490,7 @@ main {
 }
 .donation-options {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   align-items: start;
 }
@@ -529,6 +529,49 @@ main {
 }
 .wallet-maya .payment-mark { background: #00a950; }
 .paypal-mark { background: #063a7a; }
+.paypal-card { grid-column: 1 / -1; }
+.paypal-checkout-layout {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(280px, 1.1fr);
+  gap: 28px;
+  margin-top: 23px;
+}
+.paypal-amount-panel > p {
+  margin: 0 0 17px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.paypal-amounts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.paypal-amounts button {
+  min-height: 45px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--navy);
+  background: #f4f8fb;
+  cursor: pointer;
+  font-weight: 800;
+}
+.paypal-amounts button.selected {
+  border-color: var(--blue);
+  color: white;
+  background: var(--blue);
+  box-shadow: 0 8px 18px rgba(35, 117, 216, .2);
+}
+.paypal-custom-amount { display: grid; gap: 7px; margin-top: 15px; color: var(--navy); font-size: .82rem; font-weight: 800; }
+.paypal-custom-amount > span { display: grid; grid-template-columns: auto 1fr; align-items: center; overflow: hidden; border: 1px solid var(--border); border-radius: 11px; background: white; }
+.paypal-custom-amount b { padding: 0 0 0 14px; color: var(--muted); }
+.paypal-custom-amount input { width: 100%; border: 0; padding: 12px 11px 12px 7px; outline: 0; }
+.paypal-validation { display: block; margin-top: 7px; color: #a54137; }
+.paypal-button-panel { min-width: 0; padding: 18px; border-radius: 18px; background: #f4f8fb; }
+.paypal-button-panel > strong { display: block; margin-bottom: 13px; color: var(--navy); text-align: center; }
+.paypal-buttons { min-height: 45px; }
+.paypal-button-panel > small { display: block; margin-top: 9px; color: var(--muted); line-height: 1.45; text-align: center; }
+.paypal-status { margin: 10px 0 0; color: #9a3028; font-size: .82rem; text-align: center; }
+.paypal-status.success { color: #44700e; font-weight: 800; }
 .payment-card > p {
   min-height: 76px;
   margin: 30px 0;
@@ -1772,6 +1815,7 @@ select:focus {
   }
   .donation-options { grid-template-columns: 1fr 1fr; }
   .paypal-card { grid-column: 1 / -1; }
+  .paypal-checkout-layout { grid-template-columns: 1fr; }
   .payment-card > p { min-height: 0; }
   .roster-toolbar {
     grid-template-columns: 1fr 1fr;

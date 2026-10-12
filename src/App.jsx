@@ -7,7 +7,6 @@ import {
   Download,
   Edit3,
   Heart,
-  ExternalLink,
   FileUp,
   LogOut,
   LocateFixed,
@@ -312,15 +311,7 @@ function DonationPage() {
             <span className="payment-mark paypal-mark">P</span>
             <div><span>International</span><h2>PayPal</h2></div>
           </div>
-          <p>Donate securely in your preferred currency through PayPal.</p>
-          <a
-            className="button payment-action paypal-action"
-            href="https://paypal.me/GlennOcay"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open PayPal <ExternalLink size={17} />
-          </a>
+          <PayPalDonationCheckout />
         </article>
 
         {wallets.map((wallet) => (
@@ -351,6 +342,89 @@ function DonationPage() {
         </p>
       </section>
     </main>
+  );
+}
+
+const PAYPAL_CLIENT_ID = "BAAToKDHNRL6h0jbmmTnOyY6maIJE6ZNyUReGw0UsV1BDFuIaC7OhwHUkhWg_u5YSmkhnOxlKYxWv8PAH0";
+
+function PayPalDonationCheckout() {
+  const [amount, setAmount] = useState("5.00");
+  const [customAmount, setCustomAmount] = useState("");
+  const [status, setStatus] = useState("");
+  const buttonRef = useRef(null);
+  const selectedAmount = amount === "custom" ? Number(customAmount) : Number(amount);
+  const validAmount = Number.isFinite(selectedAmount) && selectedAmount >= 1 && selectedAmount <= 1000;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function renderButtons() {
+      setStatus("");
+      if (!validAmount || !buttonRef.current) return;
+      let script = document.getElementById("paypal-pickleflow-sdk");
+      if (!script) {
+        script = document.createElement("script");
+        script.id = "paypal-pickleflow-sdk";
+        script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(PAYPAL_CLIENT_ID)}&currency=USD&intent=capture&components=buttons,funding-eligibility`;
+        script.async = true;
+        document.head.appendChild(script);
+      }
+      if (!window.paypal) {
+        await new Promise((resolve, reject) => {
+          script.addEventListener("load", resolve, { once: true });
+          script.addEventListener("error", reject, { once: true });
+        });
+      }
+      if (cancelled || !buttonRef.current || !window.paypal) return;
+      buttonRef.current.replaceChildren();
+      const value = selectedAmount.toFixed(2);
+      window.paypal.Buttons({
+        style: { layout: "vertical", shape: "rect", label: "donate", height: 45 },
+        createOrder: (_data, actions) => actions.order.create({
+          purchase_units: [{
+            description: "Support PickleFlow development and hosting",
+            amount: { currency_code: "USD", value },
+          }],
+          application_context: { shipping_preference: "NO_SHIPPING" },
+        }),
+        onApprove: async (_data, actions) => {
+          await actions.order.capture();
+          setStatus(`Thank you for supporting PickleFlow with $${value}!`);
+        },
+        onCancel: () => setStatus("Payment cancelled. No charge was made."),
+        onError: () => setStatus("PayPal checkout could not be loaded. Please try again."),
+      }).render(buttonRef.current);
+    }
+
+    renderButtons().catch(() => setStatus("PayPal checkout could not be loaded. Please try again."));
+    return () => { cancelled = true; };
+  }, [selectedAmount, validAmount]);
+
+  return (
+    <div className="paypal-checkout-layout">
+      <div className="paypal-amount-panel">
+        <p>Choose an amount. PayPal will show any applicable currency conversion during checkout.</p>
+        <div className="paypal-amounts" role="group" aria-label="Donation amount">
+          {["1.00", "5.00", "10.00"].map((value) => (
+            <button key={value} type="button" className={amount === value ? "selected" : ""} onClick={() => setAmount(value)}>${Number(value)}</button>
+          ))}
+          <button type="button" className={amount === "custom" ? "selected" : ""} onClick={() => setAmount("custom")}>Custom</button>
+        </div>
+        {amount === "custom" && (
+          <label className="paypal-custom-amount">
+            Custom amount (USD)
+            <span><b>$</b><input type="number" min="1" max="1000" step="0.01" inputMode="decimal" value={customAmount} onChange={(event) => setCustomAmount(event.target.value)} placeholder="Enter amount" /></span>
+          </label>
+        )}
+        {!validAmount && amount === "custom" && <small className="paypal-validation">Enter an amount from $1 to $1,000.</small>}
+      </div>
+      <div className="paypal-button-panel">
+        <strong>Donate ${validAmount ? selectedAmount.toFixed(2) : "0.00"} USD</strong>
+        <div ref={buttonRef} className="paypal-buttons" aria-live="polite" />
+        {status && <p className={`paypal-status ${status.startsWith("Thank") ? "success" : ""}`}>{status}</p>}
+        <small>Available payment methods depend on PayPal eligibility in the donor's country.</small>
+      </div>
+    </div>
   );
 }
 
