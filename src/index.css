@@ -2877,7 +2877,53 @@ select:focus-visible {
 .player-contact {
   display: none;
 }
+.seo-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 28px;
+}
+.seo-link-grid a {
+  display: grid;
+  gap: 5px;
+  padding: 20px;
+  border: 1px solid #dce8e7;
+  border-radius: 18px;
+  color: var(--navy);
+  background: #fff;
+  text-decoration: none;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.seo-link-grid a:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(16, 51, 60, .09); }
+.seo-link-grid span { color: var(--muted); }
+.seo-page { width: min(1180px, calc(100% - 36px)); margin: 0 auto; padding: 54px 0 76px; }
+.seo-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: clamp(32px, 6vw, 80px);
+  min-height: 570px;
+}
+.seo-hero h1 { margin: 16px 0; color: var(--navy); font-size: clamp(2.4rem, 5vw, 4.7rem); line-height: 1.02; letter-spacing: -.045em; }
+.seo-hero p { max-width: 650px; color: var(--muted); font-size: clamp(1rem, 1.7vw, 1.2rem); line-height: 1.7; }
+.seo-hero > img { width: 100%; border: 1px solid #dce8e7; border-radius: 24px; box-shadow: 0 24px 60px rgba(16, 51, 60, .14); }
+.seo-benefits { padding: 72px 0; }
+.seo-benefits > h2 { margin: 10px 0 30px; color: var(--navy); font-size: clamp(2rem, 3.5vw, 3.2rem); }
+.seo-benefits > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.seo-benefits article { padding: 26px; border: 1px solid #dce8e7; border-radius: 20px; background: #fff; }
+.seo-benefits article > span { color: var(--blue); font-size: .78rem; font-weight: 900; letter-spacing: .12em; }
+.seo-benefits h3 { margin: 12px 0 8px; color: var(--navy); font-size: 1.25rem; }
+.seo-benefits p { margin: 0; color: var(--muted); line-height: 1.65; }
+.seo-cta { padding: clamp(30px, 6vw, 64px); border-radius: 28px; color: #fff; background: linear-gradient(135deg, var(--navy), #12616e); text-align: center; }
+.seo-cta h2 { max-width: 760px; margin: 0 auto 12px; font-size: clamp(1.8rem, 4vw, 3rem); }
+.seo-cta p { max-width: 680px; margin: 0 auto 24px; color: #d9edef; line-height: 1.65; }
 @media (max-width: 520px) {
+  .seo-link-grid, .seo-benefits > div { grid-template-columns: 1fr; }
+  .seo-page { width: min(100% - 24px, 1180px); padding-top: 24px; }
+  .seo-hero { grid-template-columns: 1fr; min-height: 0; padding: 28px 0; }
+  .seo-hero h1 { font-size: clamp(2.25rem, 12vw, 3.35rem); }
+  .seo-hero > img { order: -1; }
+  .seo-benefits { padding: 50px 0; }
   .game-day-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
