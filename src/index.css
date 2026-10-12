@@ -76,6 +76,31 @@ a {
   object-fit: contain;
   object-position: left center;
 }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logout-donation-dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 30px;
+  border-radius: 25px;
+  background: white;
+  box-shadow: 0 25px 70px rgba(18, 59, 102, 0.25);
+  text-align: center;
+}
+.logout-donation-dialog .donation-icon { margin: 0 auto 17px; }
+.logout-donation-dialog h2 { margin: 9px 0 11px; color: var(--navy); }
+.logout-donation-dialog p { margin: 0; color: var(--muted); line-height: 1.65; }
+.logout-donation-actions { display: grid; gap: 9px; margin-top: 23px; }
+.logout-cancel {
+  border: 0;
+  padding: 8px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+}
 
 main {
   max-width: 1180px;
@@ -526,14 +551,8 @@ main {
   display: block;
   object-fit: cover;
 }
-.wallet-gcash .wallet-qr-wrap img { object-position: center 44%; }
-.wallet-maya .wallet-qr-wrap img { object-position: center 43%; }
-.recipient-name {
-  display: block;
-  color: var(--navy);
-  text-align: center;
-  font-size: 0.88rem;
-}
+.wallet-gcash .wallet-qr-wrap img,
+.wallet-maya .wallet-qr-wrap img { object-position: center; }
 .wallet-number {
   margin-top: 12px;
   display: flex;
@@ -2404,6 +2423,13 @@ select:focus-visible {
 }
 
 @media (max-width: 370px) {
+  .topbar-actions { gap: 6px; }
+  .topbar-actions .button {
+    width: 40px;
+    min-width: 40px;
+    padding: 9px;
+    font-size: 0;
+  }
   .topbar .button {
     padding: 9px 10px;
   }
@@ -2620,8 +2646,12 @@ select:focus-visible {
 .tv-header p { margin: 4px 0 0; color: #a9c2ca; }
 .tv-header aside { display: grid; justify-items: end; gap: 7px; }
 .tv-header time { text-align: right; font-size: clamp(1.4rem, 2.6vw, 2.6rem); font-weight: 900; }
+.tv-header-actions { display: flex; align-items: center; gap: 7px; }
+.tv-header-actions a,
 .tv-header aside button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; color: #c4d5da; background: rgba(255,255,255,.08); cursor: pointer; font: inherit; font-size: .75rem; font-weight: 900; }
+.tv-header-actions a { color: #092c37; background: #ffd84d; border-color: #ffd84d; text-decoration: none; }
 .tv-header aside button.enabled { border-color: #a8f04b; color: #092c37; background: #a8f04b; }
+.tv-header-actions a svg,
 .tv-header aside button svg { width: 16px; height: 16px; }
 .tv-courts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; margin: 20px 0; }
 .tv-court { overflow: hidden; border: 1px solid rgba(255,255,255,.16); border-radius: 20px; background: rgba(255,255,255,.07); box-shadow: 0 16px 40px rgba(0,0,0,.16); }
@@ -2661,9 +2691,12 @@ select:focus-visible {
 }
 .scorer-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
 .scorer-header img { width: 150px; }
-.scorer-header div { text-align: right; display: grid; }
+.scorer-header > div { text-align: right; display: grid; }
 .scorer-header span { color: var(--muted); font-size: .8rem; }
 .scorer-header strong { color: var(--navy); }
+.scorer-header-actions { display: flex !important; align-items: center; gap: 12px; }
+.scorer-header-actions > div { display: grid; }
+.scorer-header-actions > a { display: inline-flex; align-items: center; gap: 5px; padding: 8px 11px; border-radius: 10px; color: #3d3100; background: var(--yellow); text-decoration: none; font-size: .75rem; font-weight: 800; }
 .scorer-card, .scorer-empty { background: #fff; border-radius: 22px; padding: 22px; box-shadow: 0 12px 36px rgba(16, 51, 60, .1); text-align: center; }
 .scorer-card h1 { margin: 5px 0 20px; font-size: 1.25rem; color: var(--navy); }
 .scorer-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }

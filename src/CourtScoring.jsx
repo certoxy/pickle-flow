@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Clock3, Minus, Plus, RefreshCw, Trophy } from "lucide-react";
+import { Clock3, Heart, Minus, Plus, RefreshCw, Trophy } from "lucide-react";
 import { supabase } from "./lib/supabase";
 
 export default function CourtScoring({ token }) {
@@ -55,7 +55,10 @@ export default function CourtScoring({ token }) {
     <main className="court-scoring-page">
       <header className="scorer-header">
         <img src="/brand/pickleflow-logo.png" alt="PickleFlow" />
-        <div><span>{view.event_name}</span><strong>{view.court_name}</strong></div>
+        <div className="scorer-header-actions">
+          <div><span>{view.event_name}</span><strong>{view.court_name}</strong></div>
+          <a href="/donate" target="_blank" rel="noreferrer"><Heart size={15} /> Donate</a>
+        </div>
       </header>
       {message && <div className="form-message error">{message}</div>}
       {view.game ? (
