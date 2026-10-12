@@ -22,9 +22,27 @@ export default function CourtScoring({ token }) {
   }, [token]);
 
   useEffect(() => {
-    load();
-    const timer = window.setInterval(() => load(true), 3000);
-    return () => window.clearInterval(timer);
+    let timer;
+    let stopped = false;
+    const schedule = () => {
+      window.clearTimeout(timer);
+      if (stopped || document.hidden) return;
+      timer = window.setTimeout(async () => {
+        await load(true);
+        schedule();
+      }, view?.game ? 15000 : 30000);
+    };
+    const resume = () => {
+      if (!document.hidden) load(true).finally(schedule);
+      else window.clearTimeout(timer);
+    };
+    load().finally(schedule);
+    document.addEventListener("visibilitychange", resume);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", resume);
+    };
   }, [load]);
 
   async function changeScore(team, delta) {
@@ -57,6 +75,7 @@ export default function CourtScoring({ token }) {
         <img src="/brand/pickleflow-logo.png" alt="PickleFlow" />
         <div className="scorer-header-actions">
           <div><span>{view.event_name}</span><strong>{view.court_name}</strong></div>
+          <a href="/suggest" target="_blank" rel="noreferrer">Suggest</a>
           <a href="/donate" target="_blank" rel="noreferrer"><Heart size={15} /> Donate</a>
         </div>
       </header>

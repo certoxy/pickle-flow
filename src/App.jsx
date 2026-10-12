@@ -15,6 +15,7 @@ import {
   Plus,
   Search,
   ShieldCheck,
+  MessageSquarePlus,
   Sparkles,
   Trophy,
   UserPlus,
@@ -64,6 +65,20 @@ function playerRegistrationError(error) {
   return "That email address or phone number is already registered for this event.";
 }
 
+function registrationClientId() {
+  const key = "pickleflow-registration-client";
+  try {
+    let value = window.localStorage.getItem(key);
+    if (!value) {
+      value = crypto.randomUUID();
+      window.localStorage.setItem(key, value);
+    }
+    return value;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
 const formatDate = (date) => new Date(`${date}T00:00:00`).toLocaleDateString();
 const addDays = (date, days) => {
   const value = new Date(`${date}T00:00:00`);
@@ -104,6 +119,7 @@ function Header({ session, onSignOut }) {
           <img src="/brand/pickleflow-logo.png" alt="PickleFlow" />
         </a>
         <div className="topbar-actions">
+          <a className="button button-suggest" href="/suggest" aria-label="Suggest an app improvement"><MessageSquarePlus size={17} /> Suggest App Improvements</a>
           <a className="button button-donate" href="/donate" aria-label="Donate to PickleFlow"><Heart size={17} /> Donate</a>
           {session && (
             <button className="button button-ghost" aria-label="Sign out" onClick={() => setShowDonationPrompt(true)}>
@@ -347,13 +363,19 @@ function DonationPage() {
 
 const PAYPAL_CLIENT_ID = "BAA3_0wqyoINwR8UM1c_x1hiVkudPDf-8oKO2qX8gsbyHWgv6Fv1Tgijd5F281_DFOr8z7wdSqea60FEKo";
 
-function PayPalDonationCheckout() {
-  const [amount, setAmount] = useState("5.00");
+function PayPalDonationCheckout({
+  minimum = 1,
+  initialAmount = "5.00",
+  amounts = ["1.00", "5.00", "10.00"],
+  description = "Support PickleFlow development and hosting",
+  onSuccess,
+}) {
+  const [amount, setAmount] = useState(initialAmount);
   const [customAmount, setCustomAmount] = useState("");
   const [status, setStatus] = useState("");
   const buttonRef = useRef(null);
   const selectedAmount = amount === "custom" ? Number(customAmount) : Number(amount);
-  const validAmount = Number.isFinite(selectedAmount) && selectedAmount >= 1 && selectedAmount <= 1000;
+  const validAmount = Number.isFinite(selectedAmount) && selectedAmount >= minimum && selectedAmount <= 1000;
 
   useEffect(() => {
     let cancelled = false;
@@ -382,14 +404,19 @@ function PayPalDonationCheckout() {
         style: { layout: "vertical", shape: "rect", label: "donate", height: 45 },
         createOrder: (_data, actions) => actions.order.create({
           purchase_units: [{
-            description: "Support PickleFlow development and hosting",
+            description,
             amount: { currency_code: "USD", value },
           }],
           application_context: { shipping_preference: "NO_SHIPPING" },
         }),
-        onApprove: async (_data, actions) => {
-          await actions.order.capture();
+        onApprove: async (data, actions) => {
+          const details = await actions.order.capture();
           setStatus(`Thank you for supporting PickleFlow with $${value}!`);
+          onSuccess?.({
+            orderId: data.orderID,
+            captureId: details?.purchase_units?.[0]?.payments?.captures?.[0]?.id || null,
+            amount: selectedAmount,
+          });
         },
         onCancel: () => setStatus("Payment cancelled. No charge was made."),
         onError: () => setStatus("PayPal checkout could not be loaded. Please try again."),
@@ -398,14 +425,14 @@ function PayPalDonationCheckout() {
 
     renderButtons().catch(() => setStatus("PayPal checkout could not be loaded. Please try again."));
     return () => { cancelled = true; };
-  }, [selectedAmount, validAmount]);
+  }, [description, minimum, onSuccess, selectedAmount, validAmount]);
 
   return (
     <div className="paypal-checkout-layout">
       <div className="paypal-amount-panel">
         <p>Choose an amount. PayPal will show any applicable currency conversion during checkout.</p>
         <div className="paypal-amounts" role="group" aria-label="Donation amount">
-          {["1.00", "5.00", "10.00"].map((value) => (
+          {amounts.map((value) => (
             <button key={value} type="button" className={amount === value ? "selected" : ""} onClick={() => setAmount(value)}>${Number(value)}</button>
           ))}
           <button type="button" className={amount === "custom" ? "selected" : ""} onClick={() => setAmount("custom")}>Custom</button>
@@ -413,10 +440,10 @@ function PayPalDonationCheckout() {
         {amount === "custom" && (
           <label className="paypal-custom-amount">
             Custom amount (USD)
-            <span><b>$</b><input type="number" min="1" max="1000" step="0.01" inputMode="decimal" value={customAmount} onChange={(event) => setCustomAmount(event.target.value)} placeholder="Enter amount" /></span>
+            <span><b>$</b><input type="number" min={minimum} max="1000" step="0.01" inputMode="decimal" value={customAmount} onChange={(event) => setCustomAmount(event.target.value)} placeholder={`Minimum $${minimum}`} /></span>
           </label>
         )}
-        {!validAmount && amount === "custom" && <small className="paypal-validation">Enter an amount from $1 to $1,000.</small>}
+        {!validAmount && amount === "custom" && <small className="paypal-validation">Enter an amount from ${minimum} to $1,000.</small>}
       </div>
       <div className="paypal-button-panel">
         <strong>Donate ${validAmount ? selectedAmount.toFixed(2) : "0.00"} USD</strong>
@@ -429,6 +456,84 @@ function PayPalDonationCheckout() {
         <small>Available payment methods depend on PayPal eligibility in the donor's country.</small>
       </div>
     </div>
+  );
+}
+
+function SuggestionPage({ session, onLogin }) {
+  const [donation, setDonation] = useState(null);
+  const [form, setForm] = useState({ category: "feature", title: "", details: "" });
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!session || !donation || submitting) return;
+    setSubmitting(true);
+    setMessage("");
+    const { error } = await supabase.from("app_improvement_suggestions").insert({
+      organizer_user_id: session.user.id,
+      category: form.category,
+      title: form.title.trim(),
+      details: form.details.trim(),
+      donation_amount_usd: donation.amount,
+      paypal_order_id: donation.orderId,
+      paypal_capture_id: donation.captureId,
+    });
+    setSubmitting(false);
+    if (error) return setMessage(error.message);
+    setForm({ category: "feature", title: "", details: "" });
+    setMessage("Thank you—your suggestion has been submitted.");
+  }
+
+  return (
+    <main className="suggest-page">
+      <a className="donate-back" href="/"><ArrowLeft size={17} /> Back to PickleFlow</a>
+      <section className="suggest-hero">
+        <div className="donate-heart"><MessageSquarePlus size={28} /></div>
+        <span className="eyebrow">Help shape PickleFlow</span>
+        <h1>Suggest an app improvement.</h1>
+        <p>Improvement requests are opened after a PayPal donation of at least $10 USD. Your support helps fund review, design, and continued development.</p>
+      </section>
+      {!session ? (
+        <section className="suggest-card locked-suggestion">
+          <ShieldCheck size={28} />
+          <h2>Organizer sign-in required</h2>
+          <p>Sign in first so we can associate the suggestion with your organizer account.</p>
+          <button className="button button-primary" onClick={onLogin}>Log in to continue</button>
+        </section>
+      ) : !donation ? (
+        <section className="suggest-card">
+          <h2>Donate through PayPal to continue</h2>
+          <p className="muted">Choose $10 or more. The suggestion form will open as soon as PayPal confirms the payment.</p>
+          <PayPalDonationCheckout
+            minimum={10}
+            initialAmount="10.00"
+            amounts={["10.00", "25.00", "50.00"]}
+            description="PickleFlow app improvement suggestion"
+            onSuccess={setDonation}
+          />
+        </section>
+      ) : (
+        <section className="suggest-card suggestion-unlocked">
+          <div className="suggestion-confirmed"><CheckCircle2 /><span>Donation confirmed. Thank you for supporting PickleFlow.</span></div>
+          <h2>Tell us what would make PickleFlow better</h2>
+          <form onSubmit={submit}>
+            <label>Suggestion type
+              <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+                <option value="feature">New feature</option>
+                <option value="improvement">Existing feature improvement</option>
+                <option value="usability">UI or usability</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label>Short title<input required maxLength="120" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
+            <label>Details<textarea required minLength="10" maxLength="3000" rows="7" value={form.details} onChange={(event) => setForm({ ...form, details: event.target.value })} placeholder="Describe the problem, your suggested improvement, and how it would help organizers or players." /></label>
+            {message && <div className={`form-message ${message.startsWith("Thank") ? "" : "error"}`}>{message}</div>}
+            <button className="button button-primary button-full" disabled={submitting}>{submitting ? "Submitting…" : "Submit suggestion"}</button>
+          </form>
+        </section>
+      )}
+    </main>
   );
 }
 
@@ -591,10 +696,10 @@ function TermsStep({ onAccept, onCancel }) {
         </button>
       </div>
       <div className="retention-alert">
-        <strong>15-day data retention</strong>
+        <strong>72-hour data retention</strong>
         <span>
           PickleFlow will permanently delete the event and its associated
-          player-registration data 15 days after the event date.
+          player and game data 72 hours after the event is completed.
         </span>
       </div>
       <div className="terms-copy">
@@ -631,7 +736,7 @@ function TermsStep({ onAccept, onCancel }) {
         />
         <span>
           I have read and accept the terms and conditions, including the{" "}
-          <strong>15-day data-retention policy</strong>.
+          <strong>72-hour post-event data-retention policy</strong>.
         </span>
       </label>
       <button
@@ -752,7 +857,7 @@ function EventForm({
       Object.assign(payload, {
         organizer_user_id: user.id,
         terms_accepted_at: termsAcceptedAt,
-        terms_version: "2026-10-04",
+        terms_version: "2026-10-12-72h",
       });
     const query = editing
       ? supabase.from("events").update(payload).eq("id", initialEvent.id)
@@ -969,7 +1074,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
     [importing, setImporting] = useState(false);
   const registrationOpen = event.status === "open";
   const deletionDate =
-    event.retention_extended_until || addDays(event.event_date, 15);
+    event.retention_extended_until || addDays(event.event_date, 3);
   const activeCount = players.filter(
     (player) => player.status !== "cancelled",
   ).length;
@@ -1393,7 +1498,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           <span>
             {event.retention_extended_until
               ? "Administrator-approved extended retention date."
-              : "Event and player data are deleted 15 days after the event."}
+              : "Event, player, and game data are deleted 72 hours after event completion."}
           </span>
         </div>
         {request?.status === "pending" ? (
@@ -1879,7 +1984,7 @@ function Dashboard({ session }) {
 function PublicRegistration({ code, onHome }) {
   const [event, setEvent] = useState(null),
     [count, setCount] = useState(0),
-    [form, setForm] = useState(emptyPlayer),
+    [form, setForm] = useState({ ...emptyPlayer, website: "" }),
     [message, setMessage] = useState(""),
     [success, setSuccess] = useState(false),
     [loading, setLoading] = useState(true);
@@ -1913,13 +2018,26 @@ function PublicRegistration({ code, onHome }) {
     setMessage("");
     if (spots === 0)
       return setMessage("Registration is full. Please contact the organizer.");
-    const { error } = await supabase.from("player_registrations").insert({
-      ...form,
-      full_name: form.full_name.trim(),
-      email: form.email.trim() || null,
-      phone: form.phone.trim() || null,
-      event_id: event.id,
+    let { error } = await supabase.rpc("register_player", {
+      p_event_id: event.id,
+      p_full_name: form.full_name.trim(),
+      p_email: form.email.trim() || null,
+      p_phone: form.phone.trim() || null,
+      p_skill_level: form.skill_level,
+      p_client_id: registrationClientId(),
+      p_website: form.website,
     });
+    // Keeps registration available during the short deployment window before
+    // the matching database migration is applied.
+    if (error?.code === "PGRST202" || error?.code === "42883") {
+      ({ error } = await supabase.from("player_registrations").insert({
+        event_id: event.id,
+        full_name: form.full_name.trim(),
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        skill_level: form.skill_level,
+      }));
+    }
     if (error) setMessage(playerRegistrationError(error));
     else setSuccess(true);
   }
@@ -2002,6 +2120,10 @@ function PublicRegistration({ code, onHome }) {
             <h2>Player information</h2>
             <p className="muted">You do not need a PickleFlow account.</p>
             <form onSubmit={submit}>
+              <label className="registration-honeypot" aria-hidden="true">
+                Website
+                <input tabIndex="-1" autoComplete="off" value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} />
+              </label>
               <label>
                 Full name
                 <input
@@ -2067,6 +2189,7 @@ export default function App() {
   const scoringToken = new URLSearchParams(window.location.search).get("score");
   const displayToken = new URLSearchParams(window.location.search).get("display");
   const isDonationPage = window.location.pathname.replace(/\/+$/, "") === "/donate";
+  const isSuggestionPage = window.location.pathname.replace(/\/+$/, "") === "/suggest";
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -2090,6 +2213,15 @@ export default function App() {
       <div className="app">
         <Header />
         <DonationPage />
+        <footer>PickleFlow · A PAOTECHS-powered community project</footer>
+      </div>
+    );
+  if (isSuggestionPage)
+    return (
+      <div className="app">
+        <Header session={session} onSignOut={() => supabase?.auth.signOut()} />
+        <SuggestionPage session={session} onLogin={() => { setAuthMode("signin"); setShowAuth(true); }} />
+        {showAuth && <AuthPanel initialMode={authMode} onClose={() => setShowAuth(false)} />}
         <footer>PickleFlow · A PAOTECHS-powered community project</footer>
       </div>
     );

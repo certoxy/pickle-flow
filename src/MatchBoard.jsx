@@ -51,10 +51,30 @@ export default function MatchBoard({ token }) {
   }, [token]);
 
   useEffect(() => {
-    load();
-    const refresh = window.setInterval(load, 2500);
+    let refresh;
+    let stopped = false;
+    const schedule = () => {
+      window.clearTimeout(refresh);
+      if (stopped || document.hidden) return;
+      const hasActiveGame = boardRef.current?.courts?.some((court) => court.game);
+      refresh = window.setTimeout(async () => {
+        await load();
+        schedule();
+      }, hasActiveGame ? 10000 : 30000);
+    };
+    const resume = () => {
+      if (!document.hidden) load().finally(schedule);
+      else window.clearTimeout(refresh);
+    };
+    load().finally(schedule);
+    document.addEventListener("visibilitychange", resume);
     const tick = window.setInterval(() => setClock(new Date()), 1000);
-    return () => { window.clearInterval(refresh); window.clearInterval(tick); };
+    return () => {
+      stopped = true;
+      window.clearTimeout(refresh);
+      window.clearInterval(tick);
+      document.removeEventListener("visibilitychange", resume);
+    };
   }, [load]);
 
   function toggleAnnouncements() {
@@ -77,7 +97,7 @@ export default function MatchBoard({ token }) {
     <header className="tv-header">
       <div><span className="tv-live-dot" /> LIVE MATCH BOARD</div>
       <section><h1>{board.event_name}</h1><p>{board.venue || "PickleFlow Game Day"}</p></section>
-      <aside><time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><div className="tv-header-actions"><a href="/donate" target="_blank" rel="noreferrer"><Heart /><span>Donate</span></a><button className={announcementsEnabled ? "enabled" : ""} onClick={toggleAnnouncements}>{announcementsEnabled ? <Volume2 /> : <VolumeX />}<span>{announcementsEnabled ? "Voice on" : "Enable voice"}</span></button></div></aside>
+      <aside><time>{clock.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><div className="tv-header-actions"><a href="/suggest" target="_blank" rel="noreferrer">Suggest</a><a href="/donate" target="_blank" rel="noreferrer"><Heart /><span>Donate</span></a><button className={announcementsEnabled ? "enabled" : ""} onClick={toggleAnnouncements}>{announcementsEnabled ? <Volume2 /> : <VolumeX />}<span>{announcementsEnabled ? "Voice on" : "Enable voice"}</span></button></div></aside>
     </header>
     <section className="tv-courts">
       {board.courts.map((court) => <article className={`tv-court ${court.game ? "playing" : "idle"}`} key={court.id}>

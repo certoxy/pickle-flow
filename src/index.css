@@ -179,6 +179,12 @@ main {
   background: var(--yellow);
   white-space: nowrap;
 }
+.button-suggest {
+  color: var(--navy);
+  background: #eaf3ff;
+  border: 1px solid #cfe1f6;
+  white-space: nowrap;
+}
 .button-danger {
   color: #9a3028;
   background: #fff0ed;
@@ -636,6 +642,53 @@ main {
 }
 .donation-note svg { flex: 0 0 auto; color: #4c7110; }
 .donation-note p { margin: 0; line-height: 1.6; }
+.suggest-page {
+  max-width: 920px;
+  padding-top: 24px;
+}
+.suggest-hero {
+  max-width: 720px;
+  margin: 48px auto 34px;
+  text-align: center;
+}
+.suggest-hero h1 {
+  margin: 12px 0 16px;
+  color: var(--navy);
+  font-size: clamp(2.25rem, 5vw, 4rem);
+  line-height: 1.03;
+  letter-spacing: -0.05em;
+}
+.suggest-hero p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.75;
+}
+.suggest-card {
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow);
+}
+.suggest-card > h2 { margin: 0 0 8px; color: var(--navy); }
+.suggest-card .paypal-checkout-layout { margin-top: 24px; }
+.locked-suggestion { max-width: 560px; margin: auto; text-align: center; }
+.locked-suggestion > svg { color: var(--blue); }
+.locked-suggestion p { color: var(--muted); line-height: 1.65; }
+.suggestion-confirmed {
+  margin-bottom: 22px;
+  padding: 13px 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 13px;
+  color: #365f0e;
+  background: #eff9df;
+  font-weight: 800;
+}
+.suggestion-confirmed svg { flex: 0 0 auto; }
+.suggestion-unlocked form { display: grid; gap: 16px; margin-top: 22px; }
+.suggestion-unlocked textarea { resize: vertical; }
 footer {
   padding: 28px 24px 40px;
   color: var(--muted);
@@ -1782,6 +1835,14 @@ select:focus {
 .registration-success p {
   color: var(--muted);
 }
+.registration-honeypot {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  white-space: nowrap !important;
+}
 
 @media (max-width: 800px) {
   .hero {
@@ -1961,11 +2022,20 @@ select:focus {
   }
   .topbar {
     padding: 0 16px;
+    height: auto;
+    min-height: 68px;
+    gap: 8px;
   }
+  .topbar-actions { gap: 6px; }
+  .topbar-actions .button { padding: 10px; font-size: 0; gap: 0; }
+  .topbar-actions .button svg { width: 19px; height: 19px; }
   .brand img {
-    width: 145px;
+    width: 132px;
     height: 48px;
   }
+  .suggest-page { padding: 18px 16px 54px; }
+  .suggest-hero { margin: 36px auto 28px; }
+  .suggest-card { padding: 20px; border-radius: 21px; }
   .hero-copy h1 {
     font-size: 2.65rem;
   }
