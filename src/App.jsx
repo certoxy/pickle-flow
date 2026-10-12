@@ -499,7 +499,7 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
     if (proofMethod === "email") {
       const subject = encodeURIComponent(`PickleFlow donation proof – ${selected.events} additional events`);
       const body = encodeURIComponent(`Please attach the PayPal proof for order ${donation.orderId}.\n\nOrganizer account: ${session.user.email}`);
-      window.location.href = `mailto:certoxy@gmail.com?subject=${subject}&body=${body}`;
+      window.location.href = `mailto:hello@paotechs.com?subject=${subject}&body=${body}`;
     }
     setMessage("Request submitted for Platform Admin approval.");
     onSubmitted?.();
@@ -526,7 +526,7 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
       {message && <div className={`form-message ${message.startsWith("Request submitted") ? "" : "error"}`}>{message}</div>}
       <button className="button button-primary button-full" disabled={busy} onClick={submit}>{busy ? "Submitting…" : "Submit for approval"}</button>
     </>}
-    <p className="custom-upgrade">Need a custom number of active events? <a href="mailto:certoxy@gmail.com?subject=PickleFlow custom active event allowance">Contact support</a>.</p>
+    <p className="custom-upgrade">Need a custom number of active events? <a href="mailto:hello@paotechs.com?subject=PickleFlow custom active event allowance">Contact support</a>.</p>
   </section>;
 }
 
@@ -2100,7 +2100,7 @@ function PlatformAdminPage({ session, onLogin }) {
       <div className="section-title"><div><span className="eyebrow">Upgrade requests</span><h2>Review queue</h2></div><a className="button button-secondary" href="/">Organizer dashboard</a></div>
       {!requests.length ? <div className="empty-state"><CheckCircle2 size={36} /><h3>No requests yet</h3><p>Submitted donation proofs will appear here.</p></div> : <div className="admin-request-list">{requests.map((item) => <article key={item.id}>
         <div><span className={`status-badge ${item.status}`}>{item.status}</span><h3>+{item.requested_events} active events</h3><p>${Number(item.donation_amount_usd).toFixed(2)} · {new Date(item.created_at).toLocaleString()}</p><small>Organizer: {item.organizer_user_id}</small><small>PayPal order: {item.paypal_order_id}</small></div>
-        <div className="admin-request-actions">{item.proof_method === "upload" ? <button className="button button-secondary" onClick={() => viewProof(item.proof_path)}>View proof</button> : <a className="button button-secondary" href={`mailto:certoxy@gmail.com?subject=PickleFlow proof ${item.paypal_order_id}`}>Check emailed proof</a>}{item.status === "pending" && <><button className="button button-primary" onClick={() => review(item, true)}>Approve</button><button className="button button-secondary" onClick={() => review(item, false)}>Decline</button></>}</div>
+        <div className="admin-request-actions">{item.proof_method === "upload" ? <button className="button button-secondary" onClick={() => viewProof(item.proof_path)}>View proof</button> : <a className="button button-secondary" href={`mailto:hello@paotechs.com?subject=PickleFlow proof ${item.paypal_order_id}`}>Check emailed proof</a>}{item.status === "pending" && <><button className="button button-primary" onClick={() => review(item, true)}>Approve</button><button className="button button-secondary" onClick={() => review(item, false)}>Decline</button></>}</div>
       </article>)}</div>}
     </section>
   </main>;
