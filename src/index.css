@@ -108,7 +108,7 @@ main {
   padding: 40px 24px 80px;
 }
 .hero {
-  min-height: 570px;
+  min-height: 700px;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
   gap: 64px;
@@ -144,6 +144,9 @@ main {
   flex-wrap: wrap;
   margin-top: 30px;
 }
+.hero-impact { grid-column:1/-1; display:grid; grid-template-columns:minmax(260px,.8fr) minmax(0,1.5fr); align-items:center; gap:28px; margin-top:-10px; padding:24px; border:1px solid rgba(35,117,216,.16); border-radius:24px; background:rgba(255,255,255,.72); box-shadow:0 18px 45px rgba(18,59,102,.08); backdrop-filter:blur(10px); }
+.hero-impact-copy h2 { margin:7px 0 8px; color:var(--navy); font-size:clamp(1.25rem,2vw,1.7rem); line-height:1.2; }.hero-impact-copy p { margin:0; color:var(--muted); font-size:.9rem; line-height:1.6; }
+.hero-impact-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }.hero-impact-stats article { position:relative; display:grid; min-height:116px; padding:15px; border:1px solid var(--border); border-radius:16px; background:linear-gradient(145deg,#fff,#f4f9ff); }.hero-impact-stats article>span,.hero-impact-stats small { color:var(--muted); font-size:.72rem; }.hero-impact-stats svg { position:absolute; top:15px; right:14px; width:18px; color:var(--blue); }.hero-impact-stats strong { align-self:end; color:var(--navy); font-size:1.8rem; line-height:1; }.hero-impact-stats small { margin-top:4px; }
 
 .button {
   border: 0;
@@ -1888,6 +1891,7 @@ select:focus {
   .court-card {
     max-height: none;
   }
+  .hero-impact { grid-template-columns:1fr; margin-top:0; }
   .feature-grid,
   .dashboard-grid,
   .event-grid,
@@ -2209,6 +2213,7 @@ select:focus-visible {
     gap: 24px;
     padding-top: 18px;
   }
+  .hero-impact { gap:18px; padding:17px; border-radius:20px; }.hero-impact-stats { grid-template-columns:1fr 1fr; gap:8px; }.hero-impact-stats article { min-height:104px; padding:13px; }.hero-impact-stats strong { font-size:1.55rem; }
   .hero-copy h1 {
     margin: 14px 0 18px;
     font-size: clamp(2.35rem, 12.5vw, 3.25rem);

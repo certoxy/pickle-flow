@@ -149,6 +149,18 @@ function Header({ session, onSignOut }) {
 }
 
 function Landing({ onStart, onLogin }) {
+  const [impact, setImpact] = useState({ organizers: 0, events: 0, players: 0, games: 0 });
+  useEffect(() => {
+    supabase.rpc("platform_impact_counts").then(({ data }) => {
+      if (data?.[0]) setImpact(data[0]);
+    });
+  }, []);
+  const impactStats = [
+    { label: "Organizers", value: 50 + impact.organizers, icon: <Users /> },
+    { label: "Events", value: 250 + impact.events, icon: <CalendarDays /> },
+    { label: "Players", value: 1000 + impact.players, icon: <UserPlus /> },
+    { label: "Games", value: 900 + impact.games, icon: <Activity /> },
+  ];
   return (
     <>
       <main>
@@ -183,6 +195,16 @@ function Landing({ onStart, onLogin }) {
             <div className="court-copy">
               <strong>Organize. Play. Connect.</strong>
               <span>Built for clubs and community events.</span>
+            </div>
+          </div>
+          <div className="hero-impact">
+            <div className="hero-impact-copy">
+              <span className="eyebrow">Growing with every game day</span>
+              <h2>Built for communities that would rather play than manage paperwork.</h2>
+              <p>Join organizers keeping registrations simple, courts moving, and players connected—from the first signup to the final score.</p>
+            </div>
+            <div className="hero-impact-stats" aria-label="PickleFlow community activity">
+              {impactStats.map((stat) => <article key={stat.label}><span>{stat.label}</span>{stat.icon}<strong>{stat.value.toLocaleString()}+</strong><small>and growing</small></article>)}
             </div>
           </div>
         </section>
