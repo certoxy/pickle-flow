@@ -702,7 +702,10 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
 }
 
 function SuggestionPage({ session, onLogin }) {
+  const [paymentProvider, setPaymentProvider] = useState("paypal");
   const [donation, setDonation] = useState(null);
+  const [walletAmount, setWalletAmount] = useState("580");
+  const [walletProof, setWalletProof] = useState(null);
   const [form, setForm] = useState({ category: "feature", title: "", details: "" });
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -712,14 +715,27 @@ function SuggestionPage({ session, onLogin }) {
     if (!session || !donation || submitting) return;
     setSubmitting(true);
     setMessage("");
+    let proofPath = null;
+    if (paymentProvider !== "paypal") {
+      if (!walletProof) { setSubmitting(false); return setMessage("Upload your payment receipt before submitting."); }
+      if (walletProof.size > 5 * 1024 * 1024) { setSubmitting(false); return setMessage("Proof must be 5 MB or smaller."); }
+      const safeName = walletProof.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+      proofPath = `${session.user.id}/${crypto.randomUUID()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage.from("suggestion-payment-proofs").upload(proofPath, walletProof);
+      if (uploadError) { setSubmitting(false); return setMessage(uploadError.message); }
+    }
     const { error } = await supabase.from("app_improvement_suggestions").insert({
       organizer_user_id: session.user.id,
       category: form.category,
       title: form.title.trim(),
       details: form.details.trim(),
-      donation_amount_usd: donation.amount,
-      paypal_order_id: donation.orderId,
-      paypal_capture_id: donation.captureId,
+      donation_amount_usd: paymentProvider === "paypal" ? donation.amount : null,
+      donation_amount_php: paymentProvider === "paypal" ? null : donation.amountPhp,
+      payment_provider: paymentProvider,
+      payment_reference: donation.orderId || null,
+      payment_proof_path: proofPath,
+      paypal_order_id: paymentProvider === "paypal" ? donation.orderId : null,
+      paypal_capture_id: paymentProvider === "paypal" ? donation.captureId : null,
     });
     setSubmitting(false);
     if (error) return setMessage(error.message);
@@ -734,7 +750,7 @@ function SuggestionPage({ session, onLogin }) {
         <div className="donate-heart"><MessageSquarePlus size={28} /></div>
         <span className="eyebrow">Help shape PickleFlow</span>
         <h1>Suggest an app improvement.</h1>
-        <p>Improvement requests are opened after a PayPal donation of at least $10 USD. Your support helps fund review, design, and continued development.</p>
+        <p>Improvement requests are opened after a donation of at least $10 USD or ₱580 through PayPal, GCash, or Maya. Your support helps fund review, design, and continued development.</p>
       </section>
       {!session ? (
         <section className="suggest-card locked-suggestion">
@@ -745,19 +761,25 @@ function SuggestionPage({ session, onLogin }) {
         </section>
       ) : !donation ? (
         <section className="suggest-card">
-          <h2>Donate through PayPal to continue</h2>
-          <p className="muted">Choose $10 or more. The suggestion form will open as soon as PayPal confirms the payment.</p>
-          <PayPalDonationCheckout
+          <h2>Choose how you’d like to support PickleFlow</h2>
+          <p className="muted">Donate at least $10 USD or ₱580 PHP. The suggestion form opens after payment confirmation.</p>
+          <div className="upgrade-payment-methods" role="group" aria-label="Payment method">
+            {[{ id: "paypal", name: "PayPal", detail: "USD · online checkout" }, { id: "gcash", name: "GCash", detail: "PHP · scan or send" }, { id: "maya", name: "Maya", detail: "PHP · scan or send" }].map((method) => <button type="button" key={method.id} className={paymentProvider === method.id ? "selected" : ""} onClick={() => { setPaymentProvider(method.id); setWalletProof(null); setMessage(""); }}><b>{method.name}</b><span>{method.detail}</span></button>)}
+          </div>
+          {paymentProvider === "paypal" ? <PayPalDonationCheckout
             minimum={10}
             initialAmount="10.00"
             amounts={["10.00", "25.00", "50.00"]}
             description="PickleFlow app improvement suggestion"
             onSuccess={setDonation}
-          />
+          /> : (() => { const wallet = LOCAL_PAYMENT_METHODS[paymentProvider]; const parsedAmount = Number(walletAmount); const validAmount = Number.isFinite(parsedAmount) && parsedAmount >= 580; return <div className="suggest-wallet-checkout">
+            <div className="upgrade-wallet-qr"><img src={wallet.image} alt={`${wallet.name} QR code for PickleFlow`} /></div>
+            <div className="suggest-wallet-details"><span className="eyebrow">Donate with {wallet.name}</span><h3>Scan or send to {wallet.number}</h3><div className="wallet-amounts" role="group" aria-label="Donation amount">{[580,1450,2900].map((amount) => <button type="button" key={amount} className={walletAmount === String(amount) ? "selected" : ""} onClick={() => setWalletAmount(String(amount))}>₱{amount.toLocaleString()}</button>)}<button type="button" className={!['580','1450','2900'].includes(walletAmount) ? "selected" : ""} onClick={() => setWalletAmount("")}>Custom</button></div><label>Donation amount (PHP)<input type="number" min="580" step="1" inputMode="numeric" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} /></label><label className="proof-upload"><FileUp size={20} /><span>{walletProof?.name || `Upload ${wallet.name} receipt (image or PDF, up to 5 MB)`}</span><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(event) => setWalletProof(event.target.files?.[0] || null)} /></label>{!validAmount && <small className="paypal-validation">The minimum donation is ₱580.</small>}<button className="button button-primary button-full" type="button" disabled={!validAmount || !walletProof} onClick={() => setDonation({ provider: paymentProvider, amountPhp: parsedAmount })}>Continue to suggestion</button></div>
+          </div>; })()}
         </section>
       ) : (
         <section className="suggest-card suggestion-unlocked">
-          <div className="suggestion-confirmed"><CheckCircle2 /><span>Donation confirmed. Thank you for supporting PickleFlow.</span></div>
+          <div className="suggestion-confirmed"><CheckCircle2 /><span>{paymentProvider === "paypal" ? "PayPal donation confirmed." : `${LOCAL_PAYMENT_METHODS[paymentProvider].name} payment proof attached.`} Thank you for supporting PickleFlow.</span></div>
           <h2>Tell us what would make PickleFlow better</h2>
           <form onSubmit={submit}>
             <label>Suggestion type
