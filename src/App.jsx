@@ -345,7 +345,8 @@ function DonationPage() {
   );
 }
 
-const PAYPAL_CLIENT_ID = "BAAToKDHNRL6h0jbmmTnOyY6maIJE6ZNyUReGw0UsV1BDFuIaC7OhwHUkhWg_u5YSmkhnOxlKYxWv8PAH0";
+// Add the PayPal Live Client ID here. Sandbox credentials must never be used on production.
+const PAYPAL_CLIENT_ID = "";
 
 function PayPalDonationCheckout() {
   const [amount, setAmount] = useState("5.00");
@@ -360,7 +361,7 @@ function PayPalDonationCheckout() {
 
     async function renderButtons() {
       setStatus("");
-      if (!validAmount || !buttonRef.current) return;
+      if (!PAYPAL_CLIENT_ID || !validAmount || !buttonRef.current) return;
       let script = document.getElementById("paypal-pickleflow-sdk");
       if (!script) {
         script = document.createElement("script");
@@ -420,7 +421,11 @@ function PayPalDonationCheckout() {
       </div>
       <div className="paypal-button-panel">
         <strong>Donate ${validAmount ? selectedAmount.toFixed(2) : "0.00"} USD</strong>
-        <div ref={buttonRef} className="paypal-buttons" aria-live="polite" />
+        {PAYPAL_CLIENT_ID ? (
+          <div ref={buttonRef} className="paypal-buttons" aria-live="polite" />
+        ) : (
+          <div className="paypal-setup-message">PayPal checkout is being configured. Please use GCash or Maya for now.</div>
+        )}
         {status && <p className={`paypal-status ${status.startsWith("Thank") ? "success" : ""}`}>{status}</p>}
         <small>Available payment methods depend on PayPal eligibility in the donor's country.</small>
       </div>
