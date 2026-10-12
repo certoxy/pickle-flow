@@ -459,6 +459,77 @@ function PayPalDonationCheckout({
   );
 }
 
+const ACTIVE_EVENT_PACKAGES = [
+  { events: 2, amount: 10 },
+  { events: 5, amount: 25 },
+  { events: 10, amount: 50 },
+];
+
+function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
+  const [selected, setSelected] = useState(ACTIVE_EVENT_PACKAGES[0]);
+  const [donation, setDonation] = useState(null);
+  const [proofMethod, setProofMethod] = useState("upload");
+  const [proof, setProof] = useState(null);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!donation || busy) return;
+    if (proofMethod === "upload" && !proof) return setMessage("Upload your PayPal receipt or payment confirmation.");
+    setBusy(true); setMessage("");
+    let proofPath = null;
+    if (proofMethod === "upload") {
+      if (proof.size > 5 * 1024 * 1024) { setBusy(false); return setMessage("Proof must be 5 MB or smaller."); }
+      const safeName = proof.name.replace(/[^a-zA-Z0-9._-]/g, "-");
+      proofPath = `${session.user.id}/${crypto.randomUUID()}-${safeName}`;
+      const { error: uploadError } = await supabase.storage.from("event-upgrade-proofs").upload(proofPath, proof);
+      if (uploadError) { setBusy(false); return setMessage(uploadError.message); }
+    }
+    const { error } = await supabase.from("active_event_upgrade_requests").insert({
+      organizer_user_id: session.user.id,
+      requested_events: selected.events,
+      donation_amount_usd: selected.amount,
+      paypal_order_id: donation.orderId,
+      paypal_capture_id: donation.captureId,
+      proof_method: proofMethod,
+      proof_path: proofPath,
+    });
+    setBusy(false);
+    if (error) return setMessage(error.message);
+    if (proofMethod === "email") {
+      const subject = encodeURIComponent(`PickleFlow donation proof – ${selected.events} additional events`);
+      const body = encodeURIComponent(`Please attach the PayPal proof for order ${donation.orderId}.\n\nOrganizer account: ${session.user.email}`);
+      window.location.href = `mailto:certoxy@gmail.com?subject=${subject}&body=${body}`;
+    }
+    setMessage("Request submitted for Platform Admin approval.");
+    onSubmitted?.();
+  }
+
+  return <section className="profile-card upgrade-card">
+    <button className="text-button compact" onClick={onBack}><ArrowLeft size={16} /> Back to events</button>
+    <span className="eyebrow">Increase your event allowance</span>
+    <h2>Support PickleFlow and run more active events</h2>
+    <p className="muted">Select a package, complete the PayPal donation, then upload or email your proof. Additional events are available after administrator approval.</p>
+    <div className="upgrade-packages">
+      {ACTIVE_EVENT_PACKAGES.map((item) => <button type="button" key={item.events} className={selected.events === item.events ? "selected" : ""} onClick={() => { setSelected(item); setDonation(null); }}>
+        <strong>+{item.events}</strong><span>active events</span><b>${item.amount}</b>
+      </button>)}
+    </div>
+    {!donation ? <PayPalDonationCheckout minimum={selected.amount} initialAmount={`${selected.amount}.00`} amounts={[`${selected.amount}.00`]} description={`PickleFlow +${selected.events} active events`} onSuccess={setDonation} /> : <>
+      <div className="suggestion-confirmed"><CheckCircle2 /><span>PayPal donation confirmed. Choose how to send your proof.</span></div>
+      <div className="proof-methods">
+        <label><input type="radio" checked={proofMethod === "upload"} onChange={() => setProofMethod("upload")} /> Upload proof</label>
+        <label><input type="radio" checked={proofMethod === "email"} onChange={() => setProofMethod("email")} /> Email proof</label>
+      </div>
+      {proofMethod === "upload" && <label className="proof-upload"><FileUp size={20} /><span>{proof?.name || "Choose PayPal receipt (image or PDF, up to 5 MB)"}</span><input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(event) => setProof(event.target.files?.[0] || null)} /></label>}
+      {proofMethod === "email" && <p className="form-note">After submitting, your email app will open with the order details. Attach the PayPal receipt before sending.</p>}
+      {message && <div className={`form-message ${message.startsWith("Request submitted") ? "" : "error"}`}>{message}</div>}
+      <button className="button button-primary button-full" disabled={busy} onClick={submit}>{busy ? "Submitting…" : "Submit for approval"}</button>
+    </>}
+    <p className="custom-upgrade">Need a custom number of active events? <a href="mailto:certoxy@gmail.com?subject=PickleFlow custom active event allowance">Contact support</a>.</p>
+  </section>;
+}
+
 function SuggestionPage({ session, onLogin }) {
   const [donation, setDonation] = useState(null);
   const [form, setForm] = useState({ category: "feature", title: "", details: "" });
@@ -984,7 +1055,7 @@ function EventForm({
   );
 }
 
-function EventList({ events, onSelect, onNew }) {
+function EventList({ events, onSelect, onNew, allowance, onUpgrade }) {
   async function copyLink(code) {
     await navigator.clipboard.writeText(
       `${window.location.origin}/?event=${code}`,
@@ -993,6 +1064,10 @@ function EventList({ events, onSelect, onNew }) {
   }
   return (
     <section className="events-section">
+      <div className="active-event-meter">
+        <div><span>Active events</span><strong>{allowance.active_count} of {allowance.event_limit}</strong><small>Open events dated today or later</small></div>
+        <button className="button button-donate" onClick={onUpgrade}><Heart size={17} /> Add active events</button>
+      </div>
       <div className="section-title">
         <div>
           <span className="eyebrow">Your events</span>
@@ -1748,15 +1823,17 @@ function Dashboard({ session }) {
     [view, setView] = useState("events"),
     [selectedEvent, setSelectedEvent] = useState(null),
     [termsAcceptedAt, setTermsAcceptedAt] = useState(null),
+    [allowance, setAllowance] = useState({ active_count: 0, event_limit: 3, additional_events: 0 }),
+    [isAdmin, setIsAdmin] = useState(false),
     [saved, setSaved] = useState(""),
     [loading, setLoading] = useState(true);
   async function loadEvents() {
-    const { data } = await supabase
-      .from("events")
-      .select("*")
-      .eq("organizer_user_id", session.user.id)
-      .order("event_date", { ascending: false });
-    setEvents(data || []);
+    const [eventResult, allowanceResult] = await Promise.all([
+      supabase.from("events").select("*").eq("organizer_user_id", session.user.id).order("event_date", { ascending: false }),
+      supabase.rpc("active_event_allowance", { target_user_id: session.user.id }),
+    ]);
+    setEvents(eventResult.data || []);
+    if (allowanceResult.data?.[0]) setAllowance(allowanceResult.data[0]);
   }
   useEffect(() => {
     Promise.all([
@@ -1770,11 +1847,15 @@ function Dashboard({ session }) {
         .select("*")
         .eq("organizer_user_id", session.user.id)
         .order("event_date", { ascending: false }),
-    ]).then(([profileResult, eventResult]) => {
+      supabase.rpc("active_event_allowance", { target_user_id: session.user.id }),
+      supabase.rpc("is_platform_admin"),
+    ]).then(([profileResult, eventResult, allowanceResult, adminResult]) => {
       const loadedEvents = eventResult.data || [];
       if (profileResult.data)
         setProfile({ ...emptyProfile, ...profileResult.data });
       setEvents(loadedEvents);
+      if (allowanceResult.data?.[0]) setAllowance(allowanceResult.data[0]);
+      setIsAdmin(Boolean(adminResult.data));
       try {
         const savedState = JSON.parse(
           window.localStorage.getItem(dashboardStateKey) || "null",
@@ -1853,6 +1934,7 @@ function Dashboard({ session }) {
         >
           Organizer profile
         </button>
+        {isAdmin && <a href="/admin">Platform Admin</a>}
       </nav>
       {view === "events" && (
         <EventList
@@ -1862,8 +1944,11 @@ function Dashboard({ session }) {
             setView("players");
           }}
           onNew={() => setView("terms")}
+          allowance={allowance}
+          onUpgrade={() => setView("upgrade")}
         />
       )}
+      {view === "upgrade" && <ActiveEventUpgrade session={session} onBack={() => setView("events")} onSubmitted={loadEvents} />}
       {view === "terms" && (
         <TermsStep
           onAccept={(acceptedAt) => {
@@ -1979,6 +2064,46 @@ function Dashboard({ session }) {
       )}
     </main>
   );
+}
+
+function PlatformAdminPage({ session, onLogin }) {
+  const [allowed, setAllowed] = useState(null);
+  const [requests, setRequests] = useState([]);
+  const [message, setMessage] = useState("");
+  async function load() {
+    const { data: admin } = await supabase.rpc("is_platform_admin");
+    setAllowed(Boolean(admin));
+    if (admin) {
+      const { data, error } = await supabase.from("active_event_upgrade_requests").select("*").order("created_at", { ascending: false });
+      if (error) setMessage(error.message); else setRequests(data || []);
+    }
+  }
+  useEffect(() => { if (session) load(); else setAllowed(false); }, [session]);
+  async function review(request, approve) {
+    setMessage("");
+    const { error } = await supabase.rpc("review_active_event_upgrade", { p_request_id: request.id, p_approve: approve });
+    if (error) return setMessage(error.message);
+    setMessage(approve ? `Approved +${request.requested_events} active events.` : "Request declined.");
+    load();
+  }
+  async function viewProof(path) {
+    const { data, error } = await supabase.storage.from("event-upgrade-proofs").createSignedUrl(path, 300);
+    if (error) setMessage(error.message); else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+  if (!session) return <main className="dashboard"><section className="profile-card admin-empty"><ShieldCheck /><h1>Platform Admin</h1><p>Sign in with an administrator account.</p><button className="button button-primary" onClick={onLogin}>Log in</button></section></main>;
+  if (allowed === null) return <main className="dashboard"><p>Checking administrator access…</p></main>;
+  if (!allowed) return <main className="dashboard"><section className="profile-card admin-empty"><XCircle /><h1>Access denied</h1><p>This page is available only to PickleFlow platform administrators.</p><a className="button button-secondary" href="/">Return home</a></section></main>;
+  return <main className="dashboard admin-page">
+    <section className="welcome-card"><span className="eyebrow"><ShieldCheck size={15} /> Platform Admin</span><h1>Active event upgrades</h1><p>Review donation proof before increasing an organizer’s active-event allowance.</p></section>
+    {message && <div className="form-message">{message}</div>}
+    <section className="profile-card">
+      <div className="section-title"><div><span className="eyebrow">Upgrade requests</span><h2>Review queue</h2></div><a className="button button-secondary" href="/">Organizer dashboard</a></div>
+      {!requests.length ? <div className="empty-state"><CheckCircle2 size={36} /><h3>No requests yet</h3><p>Submitted donation proofs will appear here.</p></div> : <div className="admin-request-list">{requests.map((item) => <article key={item.id}>
+        <div><span className={`status-badge ${item.status}`}>{item.status}</span><h3>+{item.requested_events} active events</h3><p>${Number(item.donation_amount_usd).toFixed(2)} · {new Date(item.created_at).toLocaleString()}</p><small>Organizer: {item.organizer_user_id}</small><small>PayPal order: {item.paypal_order_id}</small></div>
+        <div className="admin-request-actions">{item.proof_method === "upload" ? <button className="button button-secondary" onClick={() => viewProof(item.proof_path)}>View proof</button> : <a className="button button-secondary" href={`mailto:certoxy@gmail.com?subject=PickleFlow proof ${item.paypal_order_id}`}>Check emailed proof</a>}{item.status === "pending" && <><button className="button button-primary" onClick={() => review(item, true)}>Approve</button><button className="button button-secondary" onClick={() => review(item, false)}>Decline</button></>}</div>
+      </article>)}</div>}
+    </section>
+  </main>;
 }
 
 function PublicRegistration({ code, onHome }) {
@@ -2190,6 +2315,7 @@ export default function App() {
   const displayToken = new URLSearchParams(window.location.search).get("display");
   const isDonationPage = window.location.pathname.replace(/\/+$/, "") === "/donate";
   const isSuggestionPage = window.location.pathname.replace(/\/+$/, "") === "/suggest";
+  const isAdminPage = window.location.pathname.replace(/\/+$/, "") === "/admin";
   useEffect(() => {
     if (!supabase) return;
     supabase.auth.getSession().then(({ data }) => {
@@ -2221,6 +2347,15 @@ export default function App() {
       <div className="app">
         <Header session={session} onSignOut={() => supabase?.auth.signOut()} />
         <SuggestionPage session={session} onLogin={() => { setAuthMode("signin"); setShowAuth(true); }} />
+        {showAuth && <AuthPanel initialMode={authMode} onClose={() => setShowAuth(false)} />}
+        <footer>PickleFlow · A PAOTECHS-powered community project</footer>
+      </div>
+    );
+  if (isAdminPage)
+    return (
+      <div className="app">
+        <Header session={session} onSignOut={() => supabase?.auth.signOut()} />
+        <PlatformAdminPage session={session} onLogin={() => { setAuthMode("signin"); setShowAuth(true); }} />
         {showAuth && <AuthPanel initialMode={authMode} onClose={() => setShowAuth(false)} />}
         <footer>PickleFlow · A PAOTECHS-powered community project</footer>
       </div>
