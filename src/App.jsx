@@ -2075,7 +2075,7 @@ function PlatformAdminPage({ session, onLogin }) {
   const [requests, setRequests] = useState([]);
   const [organizers, setOrganizers] = useState([]);
   const [organizerSearch, setOrganizerSearch] = useState("");
-  const [expandedOrganizer, setExpandedOrganizer] = useState(null);
+  const [selectedOrganizerId, setSelectedOrganizerId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   async function load() {
@@ -2091,6 +2091,7 @@ function PlatformAdminPage({ session, onLogin }) {
       else {
         setRequests(requestResult.data || []);
         setOrganizers(organizerResult.data || []);
+        setSelectedOrganizerId((current) => current || organizerResult.data?.[0]?.user_id || null);
       }
       setLoading(false);
     }
@@ -2118,6 +2119,9 @@ function PlatformAdminPage({ session, onLogin }) {
     players: totals.players + organizer.player_count,
     games: totals.games + organizer.game_count,
   }), { events: 0, active: 0, players: 0, games: 0 });
+  const selectedOrganizer = filteredOrganizers.find((organizer) => organizer.user_id === selectedOrganizerId)
+    || filteredOrganizers[0]
+    || null;
   const dateTime = (value) => value ? new Date(value).toLocaleString() : "No activity yet";
   if (!session) return <main className="dashboard"><section className="profile-card admin-empty"><ShieldCheck /><h1>Platform Admin</h1><p>Sign in with an administrator account.</p><button className="button button-primary" onClick={onLogin}>Log in</button></section></main>;
   if (allowed === null) return <main className="dashboard"><p>Checking administrator access…</p></main>;
@@ -2134,29 +2138,32 @@ function PlatformAdminPage({ session, onLogin }) {
     <section className="profile-card admin-organizers-card">
       <div className="section-title"><div><span className="eyebrow">Organizer directory</span><h2>All organizers and activity</h2></div><a className="button button-secondary" href="/">Organizer dashboard</a></div>
       <label className="admin-search"><Search size={18} /><input value={organizerSearch} onChange={(event) => setOrganizerSearch(event.target.value)} placeholder="Search name, organization, email, phone, or location" /></label>
-      {loading ? <div className="empty-state"><p>Loading organizer activity…</p></div> : !filteredOrganizers.length ? <div className="empty-state"><Users size={36} /><h3>No organizers found</h3><p>Try a different search.</p></div> : <div className="admin-organizer-list">
-        {filteredOrganizers.map((organizer) => {
-          const expanded = expandedOrganizer === organizer.user_id;
-          return <article className="admin-organizer" key={organizer.user_id}>
-            <button className="admin-organizer-main" onClick={() => setExpandedOrganizer(expanded ? null : organizer.user_id)} aria-expanded={expanded}>
-              <div className="admin-organizer-identity"><span className="admin-avatar">{(organizer.full_name || organizer.email || "O").charAt(0).toUpperCase()}</span><div><h3>{organizer.full_name || "Organizer"}</h3><p>{organizer.organization_name || "Independent organizer"}</p><small>{organizer.email}{organizer.phone ? ` · ${organizer.phone}` : ""}</small></div></div>
-              <div className="admin-organizer-metrics"><span><b>{organizer.event_count}</b> events</span><span><b>{organizer.player_count}</b> players</span><span><b>{organizer.game_count}</b> games</span><span><b>{organizer.active_event_count}/{organizer.event_limit}</b> active</span></div>
-              <div className="admin-organizer-last"><span className={`status-badge ${organizer.profile_status}`}>{organizer.profile_status}</span><small>Last activity</small><b>{dateTime(organizer.last_activity_at)}</b></div>
-            </button>
-            {expanded && <div className="admin-organizer-details">
+      {loading ? <div className="empty-state"><p>Loading organizer activity…</p></div> : !filteredOrganizers.length ? <div className="empty-state"><Users size={36} /><h3>No organizers found</h3><p>Try a different search.</p></div> : <div className="admin-organizer-split">
+        <aside className="admin-organizer-sidebar" aria-label="Organizer list">
+          {filteredOrganizers.map((organizer) => <button className={`admin-organizer-nav ${selectedOrganizer?.user_id === organizer.user_id ? "selected" : ""}`} key={organizer.user_id} onClick={() => setSelectedOrganizerId(organizer.user_id)}>
+            <span className="admin-avatar">{(organizer.full_name || organizer.email || "O").charAt(0).toUpperCase()}</span>
+            <span><b>{organizer.full_name || "Organizer"}</b><small>{organizer.organization_name || organizer.email}</small><em>{organizer.event_count} events · {organizer.player_count} players</em></span>
+          </button>)}
+        </aside>
+        {selectedOrganizer && <article className="admin-organizer-canvas">
+          <header className="admin-organizer-canvas-header">
+            <div className="admin-organizer-identity"><span className="admin-avatar large">{(selectedOrganizer.full_name || selectedOrganizer.email || "O").charAt(0).toUpperCase()}</span><div><h3>{selectedOrganizer.full_name || "Organizer"}</h3><p>{selectedOrganizer.organization_name || "Independent organizer"}</p><small>{selectedOrganizer.email}{selectedOrganizer.phone ? ` · ${selectedOrganizer.phone}` : ""}</small></div></div>
+            <div className="admin-organizer-last"><span className={`status-badge ${selectedOrganizer.profile_status}`}>{selectedOrganizer.profile_status}</span><small>Last activity</small><b>{dateTime(selectedOrganizer.last_activity_at)}</b></div>
+          </header>
+          <div className="admin-organizer-kpis"><div><b>{selectedOrganizer.event_count}</b><span>Events</span></div><div><b>{selectedOrganizer.active_event_count}/{selectedOrganizer.event_limit}</b><span>Active</span></div><div><b>{selectedOrganizer.player_count}</b><span>Players</span></div><div><b>{selectedOrganizer.game_count}</b><span>Games</span></div></div>
+          <div className="admin-organizer-details">
               <div className="admin-detail-grid">
-                <div><span>Location</span><b>{[organizer.city, organizer.country].filter(Boolean).join(", ") || "Not provided"}</b></div>
-                <div><span>Joined</span><b>{dateTime(organizer.joined_at)}</b></div>
-                <div><span>Last sign-in</span><b>{dateTime(organizer.last_sign_in_at)}</b></div>
-                <div><span>Event allowance</span><b>{organizer.event_limit} total · +{organizer.additional_active_events} approved</b></div>
-                <div><span>Upcoming / completed events</span><b>{organizer.upcoming_event_count} / {organizer.completed_event_count}</b></div>
-                <div><span>Completed games</span><b>{organizer.completed_game_count}</b></div>
+                <div><span>Location</span><b>{[selectedOrganizer.city, selectedOrganizer.country].filter(Boolean).join(", ") || "Not provided"}</b></div>
+                <div><span>Joined</span><b>{dateTime(selectedOrganizer.joined_at)}</b></div>
+                <div><span>Last sign-in</span><b>{dateTime(selectedOrganizer.last_sign_in_at)}</b></div>
+                <div><span>Event allowance</span><b>{selectedOrganizer.event_limit} total · +{selectedOrganizer.additional_active_events} approved</b></div>
+                <div><span>Upcoming / completed events</span><b>{selectedOrganizer.upcoming_event_count} / {selectedOrganizer.completed_event_count}</b></div>
+                <div><span>Completed games</span><b>{selectedOrganizer.completed_game_count}</b></div>
               </div>
               <h4>Recent events</h4>
-              {!organizer.recent_events?.length ? <p className="muted">No events created yet.</p> : <div className="admin-recent-events">{organizer.recent_events.map((event) => <div key={event.id}><div><b>{event.name}</b><small>{formatDate(event.event_date)} · Updated {dateTime(event.updated_at)}</small></div><span className={`status-badge ${event.status}`}>{event.status}</span><span>{event.players} players</span><span>{event.games} games</span></div>)}</div>}
-            </div>}
-          </article>;
-        })}
+              {!selectedOrganizer.recent_events?.length ? <p className="muted">No events created yet.</p> : <div className="admin-recent-events">{selectedOrganizer.recent_events.map((event) => <div key={event.id}><div><b>{event.name}</b><small>{formatDate(event.event_date)} · Updated {dateTime(event.updated_at)}</small></div><span className={`status-badge ${event.status}`}>{event.status}</span><span>{event.players} players</span><span>{event.games} games</span></div>)}</div>}
+          </div>
+        </article>}
       </div>}
     </section>
     <section className="profile-card">
