@@ -748,9 +748,8 @@ function SuggestionPage({ session, onLogin }) {
     }).select("id").single();
     setSubmitting(false);
     if (error) return setMessage(error.message);
-    sendNotification("suggestion_received", { suggestionId: createdSuggestion.id });
-    setForm({ category: "feature", title: "", details: "" });
-    setMessage("Thank you—your suggestion has been submitted.");
+    await sendNotification("suggestion_received", { suggestionId: createdSuggestion.id });
+    window.location.assign("/");
   }
 
   return (
