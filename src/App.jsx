@@ -301,17 +301,11 @@ function Landing({ onStart, onLogin }) {
               </a>
             </div>
           </div>
-          <div
-            className="court-card"
-            aria-label="Pickleball court illustration"
-          >
-            <div className="court-net" />
-            <div className="ball">●</div>
-            <div className="court-copy">
-              <strong>Organize. Play. Connect.</strong>
-              <span>Built for clubs and community events.</span>
-            </div>
-          </div>
+          <img
+            className="court-card hero-image"
+            src="/social/pickleflow-hero.webp"
+            alt="PickleFlow connects pickleball registration, player queues, live scoring, and the Match Board"
+          />
           <div className="hero-impact">
             <div className="hero-impact-copy">
               <span className="eyebrow">Growing with every game day</span>
