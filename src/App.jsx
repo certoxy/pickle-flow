@@ -345,8 +345,7 @@ function DonationPage() {
   );
 }
 
-// Add the PayPal Live Client ID here. Sandbox credentials must never be used on production.
-const PAYPAL_CLIENT_ID = "";
+const PAYPAL_CLIENT_ID = "BAA3_0wqyoINwR8UM1c_x1hiVkudPDf-8oKO2qX8gsbyHWgv6Fv1Tgijd5F281_DFOr8z7wdSqea60FEKo";
 
 function PayPalDonationCheckout() {
   const [amount, setAmount] = useState("5.00");
