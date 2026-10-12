@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pickleflow-shell-v1'
+const CACHE_NAME = 'pickleflow-shell-v2'
 const APP_SHELL = ['/', '/install/', '/manifest.webmanifest', '/brand/pickleflow-icon-192.png']
 
 self.addEventListener('install', (event) => {
@@ -13,5 +13,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request).then((cached) => cached || caches.match('/'))))
+  const isNavigation = event.request.mode === 'navigate'
+  event.respondWith(
+    fetch(event.request, isNavigation ? { cache: 'no-store' } : undefined)
+      .then((response) => {
+        if (isNavigation && response.ok) {
+          const copy = response.clone()
+          event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put('/', copy)))
+        }
+        return response
+      })
+      .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/'))),
+  )
 })
