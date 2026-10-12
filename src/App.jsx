@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Activity,
   ArrowLeft,
   CalendarDays,
   CheckCircle2,
@@ -2072,13 +2073,26 @@ function Dashboard({ session }) {
 function PlatformAdminPage({ session, onLogin }) {
   const [allowed, setAllowed] = useState(null);
   const [requests, setRequests] = useState([]);
+  const [organizers, setOrganizers] = useState([]);
+  const [organizerSearch, setOrganizerSearch] = useState("");
+  const [expandedOrganizer, setExpandedOrganizer] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   async function load() {
     const { data: admin } = await supabase.rpc("is_platform_admin");
     setAllowed(Boolean(admin));
     if (admin) {
-      const { data, error } = await supabase.from("active_event_upgrade_requests").select("*").order("created_at", { ascending: false });
-      if (error) setMessage(error.message); else setRequests(data || []);
+      setLoading(true);
+      const [requestResult, organizerResult] = await Promise.all([
+        supabase.from("active_event_upgrade_requests").select("*").order("created_at", { ascending: false }),
+        supabase.rpc("admin_organizer_activity"),
+      ]);
+      if (requestResult.error || organizerResult.error) setMessage(requestResult.error?.message || organizerResult.error?.message);
+      else {
+        setRequests(requestResult.data || []);
+        setOrganizers(organizerResult.data || []);
+      }
+      setLoading(false);
     }
   }
   useEffect(() => { if (session) load(); else setAllowed(false); }, [session]);
@@ -2093,14 +2107,60 @@ function PlatformAdminPage({ session, onLogin }) {
     const { data, error } = await supabase.storage.from("event-upgrade-proofs").createSignedUrl(path, 300);
     if (error) setMessage(error.message); else window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   }
+  const filteredOrganizers = organizers.filter((organizer) => {
+    const query = organizerSearch.trim().toLowerCase();
+    return !query || [organizer.full_name, organizer.organization_name, organizer.email, organizer.phone, organizer.city, organizer.country]
+      .some((value) => String(value || "").toLowerCase().includes(query));
+  });
+  const organizerTotals = organizers.reduce((totals, organizer) => ({
+    events: totals.events + organizer.event_count,
+    active: totals.active + organizer.active_event_count,
+    players: totals.players + organizer.player_count,
+    games: totals.games + organizer.game_count,
+  }), { events: 0, active: 0, players: 0, games: 0 });
+  const dateTime = (value) => value ? new Date(value).toLocaleString() : "No activity yet";
   if (!session) return <main className="dashboard"><section className="profile-card admin-empty"><ShieldCheck /><h1>Platform Admin</h1><p>Sign in with an administrator account.</p><button className="button button-primary" onClick={onLogin}>Log in</button></section></main>;
   if (allowed === null) return <main className="dashboard"><p>Checking administrator access…</p></main>;
   if (!allowed) return <main className="dashboard"><section className="profile-card admin-empty"><XCircle /><h1>Access denied</h1><p>This page is available only to PickleFlow platform administrators.</p><a className="button button-secondary" href="/">Return home</a></section></main>;
   return <main className="dashboard admin-page">
-    <section className="welcome-card"><span className="eyebrow"><ShieldCheck size={15} /> Platform Admin</span><h1>Active event upgrades</h1><p>Review donation proof before increasing an organizer’s active-event allowance.</p></section>
+    <section className="welcome-card"><span className="eyebrow"><ShieldCheck size={15} /> Platform Admin</span><h1>Platform activity</h1><p>Monitor organizers, events, player registrations, games, and active-event upgrade requests.</p></section>
     {message && <div className="form-message">{message}</div>}
+    <section className="admin-summary-grid">
+      <article><Users size={20} /><span>Organizers</span><strong>{organizers.length}</strong></article>
+      <article><CalendarDays size={20} /><span>Events</span><strong>{organizerTotals.events}</strong><small>{organizerTotals.active} active</small></article>
+      <article><UserPlus size={20} /><span>Players</span><strong>{organizerTotals.players}</strong></article>
+      <article><Activity size={20} /><span>Games</span><strong>{organizerTotals.games}</strong></article>
+    </section>
+    <section className="profile-card admin-organizers-card">
+      <div className="section-title"><div><span className="eyebrow">Organizer directory</span><h2>All organizers and activity</h2></div><a className="button button-secondary" href="/">Organizer dashboard</a></div>
+      <label className="admin-search"><Search size={18} /><input value={organizerSearch} onChange={(event) => setOrganizerSearch(event.target.value)} placeholder="Search name, organization, email, phone, or location" /></label>
+      {loading ? <div className="empty-state"><p>Loading organizer activity…</p></div> : !filteredOrganizers.length ? <div className="empty-state"><Users size={36} /><h3>No organizers found</h3><p>Try a different search.</p></div> : <div className="admin-organizer-list">
+        {filteredOrganizers.map((organizer) => {
+          const expanded = expandedOrganizer === organizer.user_id;
+          return <article className="admin-organizer" key={organizer.user_id}>
+            <button className="admin-organizer-main" onClick={() => setExpandedOrganizer(expanded ? null : organizer.user_id)} aria-expanded={expanded}>
+              <div className="admin-organizer-identity"><span className="admin-avatar">{(organizer.full_name || organizer.email || "O").charAt(0).toUpperCase()}</span><div><h3>{organizer.full_name || "Organizer"}</h3><p>{organizer.organization_name || "Independent organizer"}</p><small>{organizer.email}{organizer.phone ? ` · ${organizer.phone}` : ""}</small></div></div>
+              <div className="admin-organizer-metrics"><span><b>{organizer.event_count}</b> events</span><span><b>{organizer.player_count}</b> players</span><span><b>{organizer.game_count}</b> games</span><span><b>{organizer.active_event_count}/{organizer.event_limit}</b> active</span></div>
+              <div className="admin-organizer-last"><span className={`status-badge ${organizer.profile_status}`}>{organizer.profile_status}</span><small>Last activity</small><b>{dateTime(organizer.last_activity_at)}</b></div>
+            </button>
+            {expanded && <div className="admin-organizer-details">
+              <div className="admin-detail-grid">
+                <div><span>Location</span><b>{[organizer.city, organizer.country].filter(Boolean).join(", ") || "Not provided"}</b></div>
+                <div><span>Joined</span><b>{dateTime(organizer.joined_at)}</b></div>
+                <div><span>Last sign-in</span><b>{dateTime(organizer.last_sign_in_at)}</b></div>
+                <div><span>Event allowance</span><b>{organizer.event_limit} total · +{organizer.additional_active_events} approved</b></div>
+                <div><span>Upcoming / completed events</span><b>{organizer.upcoming_event_count} / {organizer.completed_event_count}</b></div>
+                <div><span>Completed games</span><b>{organizer.completed_game_count}</b></div>
+              </div>
+              <h4>Recent events</h4>
+              {!organizer.recent_events?.length ? <p className="muted">No events created yet.</p> : <div className="admin-recent-events">{organizer.recent_events.map((event) => <div key={event.id}><div><b>{event.name}</b><small>{formatDate(event.event_date)} · Updated {dateTime(event.updated_at)}</small></div><span className={`status-badge ${event.status}`}>{event.status}</span><span>{event.players} players</span><span>{event.games} games</span></div>)}</div>}
+            </div>}
+          </article>;
+        })}
+      </div>}
+    </section>
     <section className="profile-card">
-      <div className="section-title"><div><span className="eyebrow">Upgrade requests</span><h2>Review queue</h2></div><a className="button button-secondary" href="/">Organizer dashboard</a></div>
+      <div className="section-title"><div><span className="eyebrow">Upgrade requests</span><h2>Review queue</h2></div></div>
       {!requests.length ? <div className="empty-state"><CheckCircle2 size={36} /><h3>No requests yet</h3><p>Submitted donation proofs will appear here.</p></div> : <div className="admin-request-list">{requests.map((item) => <article key={item.id}>
         <div><span className={`status-badge ${item.status}`}>{item.status}</span><h3>+{item.requested_events} active events</h3><p>${Number(item.donation_amount_usd).toFixed(2)} · {new Date(item.created_at).toLocaleString()}</p><small>Organizer: {item.organizer_user_id}</small><small>PayPal order: {item.paypal_order_id}</small></div>
         <div className="admin-request-actions">{item.proof_method === "upload" ? <button className="button button-secondary" onClick={() => viewProof(item.proof_path)}>View proof</button> : <a className="button button-secondary" href={`mailto:hello@paotechs.com?subject=PickleFlow proof ${item.paypal_order_id}`}>Check emailed proof</a>}{item.status === "pending" && <><button className="button button-primary" onClick={() => review(item, true)}>Approve</button><button className="button button-secondary" onClick={() => review(item, false)}>Decline</button></>}</div>
