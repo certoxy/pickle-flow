@@ -59,6 +59,14 @@ const emptyPlayer = {
   skill_level: "beginner",
 };
 
+async function sendNotification(type, payload) {
+  try {
+    await supabase.functions.invoke("send-notification", { body: { type, ...payload } });
+  } catch {
+    // Notifications never block the organizer's primary action.
+  }
+}
+
 function playerRegistrationError(error) {
   if (error.code !== "23505") return error.message;
   if ((error.message || "").toLowerCase().includes("name"))
@@ -642,7 +650,7 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
       const { error: uploadError } = await supabase.storage.from("event-upgrade-proofs").upload(proofPath, proof);
       if (uploadError) { setBusy(false); return setMessage(uploadError.message); }
     }
-    const { error } = await supabase.from("active_event_upgrade_requests").insert({
+    const { data: createdRequest, error } = await supabase.from("active_event_upgrade_requests").insert({
       organizer_user_id: session.user.id,
       requested_events: selected.events,
       donation_amount_usd: selected.amount,
@@ -653,9 +661,10 @@ function ActiveEventUpgrade({ session, onBack, onSubmitted }) {
       paypal_capture_id: paymentProvider === "paypal" ? donation.captureId : null,
       proof_method: proofMethod,
       proof_path: proofPath,
-    });
+    }).select("id").single();
     setBusy(false);
     if (error) return setMessage(error.message);
+    sendNotification("upgrade_received", { requestId: createdRequest.id });
     if (proofMethod === "email") {
       const providerName = paymentProvider === "paypal" ? "PayPal" : LOCAL_PAYMENT_METHODS[paymentProvider].name;
       const subject = encodeURIComponent(`PickleFlow payment proof | +${selected.events} active events`);
@@ -724,7 +733,7 @@ function SuggestionPage({ session, onLogin }) {
       const { error: uploadError } = await supabase.storage.from("suggestion-payment-proofs").upload(proofPath, walletProof);
       if (uploadError) { setSubmitting(false); return setMessage(uploadError.message); }
     }
-    const { error } = await supabase.from("app_improvement_suggestions").insert({
+    const { data: createdSuggestion, error } = await supabase.from("app_improvement_suggestions").insert({
       organizer_user_id: session.user.id,
       category: form.category,
       title: form.title.trim(),
@@ -736,9 +745,10 @@ function SuggestionPage({ session, onLogin }) {
       payment_proof_path: proofPath,
       paypal_order_id: paymentProvider === "paypal" ? donation.orderId : null,
       paypal_capture_id: paymentProvider === "paypal" ? donation.captureId : null,
-    });
+    }).select("id").single();
     setSubmitting(false);
     if (error) return setMessage(error.message);
+    sendNotification("suggestion_received", { suggestionId: createdSuggestion.id });
     setForm({ category: "feature", title: "", details: "" });
     setMessage("Thank you—your suggestion has been submitted.");
   }
@@ -2294,6 +2304,7 @@ function PlatformAdminPage({ session, onLogin }) {
     setMessage("");
     const { error } = await supabase.rpc("review_active_event_upgrade", { p_request_id: request.id, p_approve: approve });
     if (error) return setMessage(error.message);
+    sendNotification("upgrade_reviewed", { requestId: request.id });
     setMessage(approve ? `Approved +${request.requested_events} active events.` : "Request declined.");
     load();
   }
@@ -2305,6 +2316,7 @@ function PlatformAdminPage({ session, onLogin }) {
     setMessage("");
     const { error } = await supabase.from("app_improvement_suggestions").update({ status }).eq("id", id);
     if (error) return setMessage(error.message);
+    sendNotification("suggestion_status", { suggestionId: id });
     setSuggestions((current) => current.map((item) => item.id === id ? { ...item, status } : item));
     setMessage(`Suggestion moved to ${status}.`);
   }
