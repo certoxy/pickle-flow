@@ -1434,6 +1434,52 @@ select:focus {
   color: #775310;
   background: #fff7e7;
 }
+.direct-score-status,
+.direct-sync-callout,
+.direct-court-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #c8ddec;
+  color: #205774;
+  background: #edf7fc;
+  font-size: .8rem;
+  font-weight: 800;
+}
+.direct-score-status {
+  margin: 0 0 14px 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+.direct-score-status.connected,
+.direct-sync-callout.connected,
+.direct-court-status.connected {
+  border-color: #bfe4d0;
+  color: #17613d;
+  background: #ecfbf3;
+}
+.direct-score-status.error,
+.direct-score-status.unsupported,
+.direct-sync-callout.error {
+  border-color: #f0ce91;
+  color: #775310;
+  background: #fff7e7;
+}
+.direct-sync-callout {
+  width: 100%;
+  margin: 12px 0 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  text-align: left;
+}
+.direct-sync-callout span,
+.direct-sync-callout strong { display: block; }
+.direct-sync-callout strong { color: inherit; }
+.direct-court-status {
+  padding: 5px 7px;
+  border-radius: 999px;
+  font-size: .68rem;
+}
 .game-day-summary {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

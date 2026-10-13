@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clock3, Heart, Minus, Plus, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
+import { Clock3, Heart, Minus, Plus, Radio, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
 import { supabase } from "./lib/supabase";
 import {
   acknowledgePendingScore,
@@ -8,6 +8,7 @@ import {
   pendingScoreForCourt,
   savePendingScore,
 } from "./lib/offlineScores";
+import { createScorerDirectSync } from "./lib/directScoreSync";
 
 export default function CourtScoring({ token }) {
   const cached = getCachedCourtView(token);
@@ -21,8 +22,10 @@ export default function CourtScoring({ token }) {
   const [pendingCount, setPendingCount] = useState(
     pendingScoreForCourt(token, cached?.game?.id) ? 1 : 0,
   );
+  const [directState, setDirectState] = useState("pairing");
   const syncTimer = useRef(null);
   const flushing = useRef(false);
+  const directSync = useRef(null);
   const activeGameId = view?.game?.id;
   const hasActiveGame = Boolean(activeGameId);
 
@@ -103,6 +106,28 @@ export default function CourtScoring({ token }) {
   }, [activeGameId, token]);
 
   useEffect(() => {
+    directSync.current = createScorerDirectSync({
+      token,
+      onStatus: setDirectState,
+      onAck: (ack) => {
+        const pending = pendingScoreForCourt(token, ack.gameId);
+        if (
+          pending &&
+          Number(pending.one) === Number(ack.one) &&
+          Number(pending.two) === Number(ack.two)
+        ) {
+          acknowledgePendingScore(pending);
+          setPendingCount(0);
+        }
+      },
+    });
+    return () => {
+      directSync.current?.close();
+      directSync.current = null;
+    };
+  }, [token]);
+
+  useEffect(() => {
     let timer;
     let stopped = false;
     const schedule = () => {
@@ -156,6 +181,7 @@ export default function CourtScoring({ token }) {
       const nextView = { ...currentView, game: { ...game, team_one_score: one, team_two_score: two } };
       cacheCourtView(token, nextView);
       savePendingScore({ mode: "court", token, gameId: game.id, one, two });
+      directSync.current?.sendScore({ gameId: game.id, one, two });
       setPendingCount(1);
       setIsOnline(navigator.onLine);
       setSyncState(navigator.onLine ? "syncing" : "pending");
@@ -187,6 +213,10 @@ export default function CourtScoring({ token }) {
           : syncState === "syncing" ? "Syncing score…"
             : syncState === "error" ? "Score saved · waiting to retry"
               : "Online · Score synced"}</span>
+      </div>
+      <div className={`direct-score-status ${directState}`} role="status">
+        <Radio size={17} />
+        <span>{directState === "connected" ? "Direct to organizer · Connected" : directState === "unsupported" ? "Direct sync is not supported on this browser" : directState === "error" ? "Direct sync unavailable · online scoring remains active" : "Pairing directly with organizer…"}</span>
       </div>
       {message && <div className="form-message error">{message}</div>}
       {view.game ? (

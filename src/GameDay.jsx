@@ -12,6 +12,7 @@ import {
   MonitorUp,
   Play,
   Plus,
+  Radio,
   RefreshCw,
   RotateCcw,
   Swords,
@@ -29,6 +30,7 @@ import {
   pendingScoresForEvent,
   savePendingScore,
 } from "./lib/offlineScores";
+import { createOrganizerDirectSync } from "./lib/directScoreSync";
 
 const playerName = (players, id) =>
   players.find((player) => player.id === id)?.full_name || "Unknown player";
@@ -68,7 +70,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [pendingScoreCount, setPendingScoreCount] = useState(
     () => pendingScoresForEvent(event.id).length,
   );
+  const [directConnections, setDirectConnections] = useState({});
   const scoreSaveChains = useRef({});
+  const directSyncs = useRef(new Map());
+  const gamesRef = useRef([]);
   const teamSize = event.game_format === "singles" ? 1 : 2;
   const playersNeeded = teamSize * 2;
 
@@ -126,6 +131,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   useEffect(() => {
     load();
   }, [event.id]);
+
+  useEffect(() => {
+    gamesRef.current = games;
+  }, [games]);
+
+  useEffect(() => () => {
+    directSyncs.current.forEach((sync) => sync.close());
+    directSyncs.current.clear();
+  }, []);
 
   useEffect(() => {
     const handleOffline = () => {
@@ -478,6 +492,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     if (error) return setMessage(error.message);
     const access = data?.[0];
     const url = `${window.location.origin}/?score=${access.access_token}`;
+    directSyncs.current.get(court.id)?.close();
+    setDirectConnections((current) => ({ ...current, [court.id]: "waiting" }));
+    const directSync = createOrganizerDirectSync({
+      token: access.access_token,
+      onStatus: (status) =>
+        setDirectConnections((current) => ({ ...current, [court.id]: status })),
+      onScore: handleDirectScore,
+    });
+    directSyncs.current.set(court.id, directSync);
     setScoringLink({ court, url, expiresAt: access.expires_at });
   }
 
@@ -814,6 +837,35 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     return true;
   }
 
+  function handleDirectScore(message) {
+    const game = gamesRef.current.find((item) => item.id === message.gameId);
+    if (!game || game.status !== "playing") return;
+    const next = {
+      one: Math.max(0, Number(message.one || 0)),
+      two: Math.max(0, Number(message.two || 0)),
+    };
+    setScores((current) => ({ ...current, [game.id]: next }));
+    const entry = savePendingScore({
+      mode: "organizer",
+      eventId: event.id,
+      gameId: game.id,
+      one: next.one,
+      two: next.two,
+    });
+    setPendingScoreCount(pendingScoresForEvent(event.id).length);
+    setSyncState(navigator.onLine ? "syncing" : "offline");
+    if (navigator.onLine) {
+      scoreSaveChains.current[game.id] = (
+        scoreSaveChains.current[game.id] || Promise.resolve()
+      ).then(() => syncPendingScore(entry));
+    }
+    if (
+      Math.max(next.one, next.two) >= game.points_to_win &&
+      next.one !== next.two
+    )
+      setCompletionPrompt({ game, score: next });
+  }
+
   async function flushPendingScores() {
     if (!navigator.onLine) return false;
     const pending = pendingScoresForEvent(event.id);
@@ -1022,6 +1074,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             <span className="eyebrow">Temporary umpire access</span>
             <h2 id="scorer-link-title">{scoringLink.court.name} scoring link</h2>
             <p className="muted">Anyone with this link can update this court’s live score for 24 hours. Only the organizer can confirm the result.</p>
+            <div className={`direct-sync-callout ${directConnections[scoringLink.court.id] || "waiting"}`}>
+              <Radio size={18} />
+              <span><strong>Direct device sync</strong>{directConnections[scoringLink.court.id] === "connected" ? "Connected to scoring device" : directConnections[scoringLink.court.id] === "error" ? "Pairing unavailable · online scoring still works" : "Waiting for the scoring device to scan this QR"}</span>
+            </div>
             <div className="scorer-qr-wrap">
               <QRCodeCanvas
                 id="court-scoring-qr"
@@ -1533,6 +1589,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                     </button>
                     <button className="court-icon-button" onClick={() => beginCourtRename(court)} aria-label={`Edit ${court.name} name`} title="Edit court name"><Edit3 size={17} /></button>
                     <button className="court-link-button" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
+                    {directConnections[court.id] && <span className={`direct-court-status ${directConnections[court.id]}`} title="Direct device sync"><Radio size={13} />{directConnections[court.id] === "connected" ? "Direct" : "Pairing"}</span>}
                   </>}
                 </div>
               ))}
