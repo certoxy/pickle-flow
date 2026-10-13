@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 const RTC_CONFIG = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
+const OFFLINE_RTC_CONFIG = { iceServers: [] };
 
 const channelName = (token) => `direct-score-${token}`;
 
@@ -12,6 +13,67 @@ function parseMessage(event) {
   } catch {
     return null;
   }
+}
+
+const bytesToBase64Url = (bytes) => {
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+
+const base64UrlToBytes = (value) => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+async function encodeHandshake(description) {
+  const bytes = new TextEncoder().encode(JSON.stringify(description));
+  if (!("CompressionStream" in window)) return `r.${bytesToBase64Url(bytes)}`;
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip"));
+  return `g.${bytesToBase64Url(new Uint8Array(await new Response(stream).arrayBuffer()))}`;
+}
+
+async function decodeHandshake(value) {
+  const [format, encoded] = String(value || "").split(".", 2);
+  if (!encoded) throw new Error("Invalid offline pairing code");
+  let bytes = base64UrlToBytes(encoded);
+  if (format === "g") {
+    if (!("DecompressionStream" in window)) throw new Error("Compressed pairing codes are not supported by this browser");
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+    bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+  } else if (format !== "r") throw new Error("Invalid offline pairing code");
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function waitForIceGathering(pc, timeout = 4000) {
+  if (pc.iceGatheringState === "complete") return Promise.resolve();
+  return new Promise((resolve) => {
+    const finish = () => {
+      window.clearTimeout(timer);
+      pc.removeEventListener("icegatheringstatechange", changed);
+      resolve();
+    };
+    const changed = () => { if (pc.iceGatheringState === "complete") finish(); };
+    const timer = window.setTimeout(finish, timeout);
+    pc.addEventListener("icegatheringstatechange", changed);
+  });
+}
+
+function wireOrganizerDataChannel(dataChannel, onScore, onStatus, closed) {
+  dataChannel.onopen = () => onStatus?.("connected");
+  dataChannel.onclose = () => { if (!closed()) onStatus?.("waiting"); };
+  dataChannel.onerror = () => onStatus?.("error");
+  dataChannel.onmessage = (event) => {
+    const message = parseMessage(event);
+    if (message?.type !== "score") return;
+    onScore?.(message);
+    if (dataChannel.readyState === "open")
+      dataChannel.send(JSON.stringify({
+        type: "ack", gameId: message.gameId, one: message.one,
+        two: message.two, messageId: message.messageId,
+      }));
+  };
 }
 
 export function directSyncSupported() {
@@ -228,6 +290,107 @@ export function createScorerDirectSync({ token, onStatus, onAck }) {
       window.clearTimeout(readyTimer);
       pc?.close();
       supabase.removeChannel(channel);
+    },
+  };
+}
+
+export function createOfflineOrganizerSync({ onScore, onStatus, getView }) {
+  if (!directSyncSupported()) {
+    onStatus?.("unsupported");
+    return { createOffer: async () => { throw new Error("Direct sync is not supported"); }, acceptAnswer: async () => {}, sendView() {}, close() {} };
+  }
+  let pc = null;
+  let dataChannel = null;
+  let closed = false;
+
+  const sendView = (view = getView?.()) => {
+    if (view && dataChannel?.readyState === "open")
+      dataChannel.send(JSON.stringify({ type: "court-view", view }));
+  };
+
+  return {
+    async createOffer() {
+      pc?.close();
+      pc = new RTCPeerConnection(OFFLINE_RTC_CONFIG);
+      dataChannel = pc.createDataChannel("pickleflow-offline-scores", { ordered: true });
+      wireOrganizerDataChannel(dataChannel, onScore, onStatus, () => closed);
+      const originalOpen = dataChannel.onopen;
+      dataChannel.onopen = (event) => {
+        originalOpen?.(event);
+        sendView();
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "connected") onStatus?.("connected");
+        if (["failed", "disconnected"].includes(pc.connectionState) && !closed) onStatus?.("error");
+      };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await waitForIceGathering(pc);
+      onStatus?.("offer-ready");
+      return encodeHandshake(pc.localDescription.toJSON());
+    },
+    async acceptAnswer(code) {
+      if (!pc) throw new Error("Create an offline pairing offer first");
+      const description = await decodeHandshake(String(code).replace(/^pickleflow-answer:/, ""));
+      await pc.setRemoteDescription(description);
+      onStatus?.("connecting");
+    },
+    sendView,
+    close() {
+      closed = true;
+      pc?.close();
+    },
+  };
+}
+
+export function createOfflineScorerSync({ onStatus, onAck, onView }) {
+  if (!directSyncSupported()) {
+    onStatus?.("unsupported");
+    return { acceptOffer: async () => { throw new Error("Direct sync is not supported"); }, sendScore: () => false, close() {} };
+  }
+  let pc = null;
+  let dataChannel = null;
+  let closed = false;
+
+  const wire = (channel) => {
+    dataChannel = channel;
+    dataChannel.onopen = () => onStatus?.("connected");
+    dataChannel.onclose = () => { if (!closed) onStatus?.("pairing"); };
+    dataChannel.onerror = () => onStatus?.("error");
+    dataChannel.onmessage = (event) => {
+      const message = parseMessage(event);
+      if (message?.type === "ack") onAck?.(message);
+      if (message?.type === "court-view") onView?.(message.view);
+    };
+  };
+
+  return {
+    async acceptOffer(code) {
+      pc?.close();
+      pc = new RTCPeerConnection(OFFLINE_RTC_CONFIG);
+      pc.ondatachannel = ({ channel }) => wire(channel);
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === "connected") onStatus?.("connected");
+        if (["failed", "disconnected"].includes(pc.connectionState) && !closed) onStatus?.("error");
+      };
+      await pc.setRemoteDescription(await decodeHandshake(code));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      await waitForIceGathering(pc);
+      onStatus?.("answer-ready");
+      return encodeHandshake(pc.localDescription.toJSON());
+    },
+    sendScore(score) {
+      if (dataChannel?.readyState !== "open") return false;
+      dataChannel.send(JSON.stringify({
+        type: "score", messageId: crypto.randomUUID(),
+        sentAt: new Date().toISOString(), ...score,
+      }));
+      return true;
+    },
+    close() {
+      closed = true;
+      pc?.close();
     },
   };
 }

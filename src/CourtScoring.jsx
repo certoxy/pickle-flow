@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock3, Heart, Minus, Plus, Radio, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
+import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "./lib/supabase";
 import {
   acknowledgePendingScore,
@@ -8,7 +9,7 @@ import {
   pendingScoreForCourt,
   savePendingScore,
 } from "./lib/offlineScores";
-import { createScorerDirectSync } from "./lib/directScoreSync";
+import { createOfflineScorerSync, createScorerDirectSync } from "./lib/directScoreSync";
 
 export default function CourtScoring({ token }) {
   const cached = getCachedCourtView(token);
@@ -23,9 +24,12 @@ export default function CourtScoring({ token }) {
     pendingScoreForCourt(token, cached?.game?.id) ? 1 : 0,
   );
   const [directState, setDirectState] = useState("pairing");
+  const [offlineAnswer, setOfflineAnswer] = useState("");
+  const [offlineError, setOfflineError] = useState("");
   const syncTimer = useRef(null);
   const flushing = useRef(false);
   const directSync = useRef(null);
+  const offlineSync = useRef(null);
   const activeGameId = view?.game?.id;
   const hasActiveGame = Boolean(activeGameId);
 
@@ -106,24 +110,44 @@ export default function CourtScoring({ token }) {
   }, [activeGameId, token]);
 
   useEffect(() => {
-    directSync.current = createScorerDirectSync({
-      token,
-      onStatus: setDirectState,
-      onAck: (ack) => {
-        const pending = pendingScoreForCourt(token, ack.gameId);
-        if (
-          pending &&
-          Number(pending.one) === Number(ack.one) &&
-          Number(pending.two) === Number(ack.two)
-        ) {
-          acknowledgePendingScore(pending);
-          setPendingCount(0);
-        }
-      },
-    });
+    const acknowledgeDirectScore = (ack) => {
+      const pending = pendingScoreForCourt(token, ack.gameId);
+      if (
+        pending &&
+        Number(pending.one) === Number(ack.one) &&
+        Number(pending.two) === Number(ack.two)
+      ) {
+        acknowledgePendingScore(pending);
+        setPendingCount(0);
+      }
+    };
+    const offer = new URLSearchParams(window.location.search).get("offlineOffer");
+    if (offer) {
+      offlineSync.current = createOfflineScorerSync({
+        onStatus: setDirectState,
+        onAck: acknowledgeDirectScore,
+        onView: (nextView) => {
+          cacheCourtView(token, nextView);
+          setView(applyPendingScore(nextView));
+          setLoading(false);
+          setMessage("");
+        },
+      });
+      offlineSync.current.acceptOffer(offer)
+        .then((answer) => setOfflineAnswer(`pickleflow-answer:${answer}`))
+        .catch((error) => setOfflineError(error.message));
+    } else {
+      directSync.current = createScorerDirectSync({
+        token,
+        onStatus: setDirectState,
+        onAck: acknowledgeDirectScore,
+      });
+    }
     return () => {
       directSync.current?.close();
       directSync.current = null;
+      offlineSync.current?.close();
+      offlineSync.current = null;
     };
   }, [token]);
 
@@ -182,6 +206,7 @@ export default function CourtScoring({ token }) {
       cacheCourtView(token, nextView);
       savePendingScore({ mode: "court", token, gameId: game.id, one, two });
       directSync.current?.sendScore({ gameId: game.id, one, two });
+      offlineSync.current?.sendScore({ gameId: game.id, one, two });
       setPendingCount(1);
       setIsOnline(navigator.onLine);
       setSyncState(navigator.onLine ? "syncing" : "pending");
@@ -218,6 +243,14 @@ export default function CourtScoring({ token }) {
         <Radio size={17} />
         <span>{directState === "connected" ? "Direct to organizer · Connected" : directState === "unsupported" ? "Direct sync is not supported on this browser" : directState === "error" ? "Direct sync unavailable · online scoring remains active" : "Pairing directly with organizer…"}</span>
       </div>
+      {offlineAnswer && directState !== "connected" && <section className="offline-response-card">
+        <span className="eyebrow">Offline pairing · Step 2</span>
+        <h2>Scan this response on the organizer device</h2>
+        <QRCodeCanvas value={offlineAnswer} size={270} level="L" marginSize={2} />
+        <p>Keep this page open. The status above will change when the direct connection is ready.</p>
+        <details><summary>Response code fallback</summary><textarea readOnly value={offlineAnswer} onFocus={(event) => event.target.select()} /></details>
+      </section>}
+      {offlineError && <div className="form-message error">Offline pairing failed: {offlineError}</div>}
       {message && <div className="form-message error">{message}</div>}
       {view.game ? (
         <section className="scorer-card">

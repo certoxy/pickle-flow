@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
+  Camera,
   Check,
   Clock3,
   Copy,
@@ -24,13 +25,14 @@ import {
   X,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
+import QrScanner from "./QrScanner";
 import { supabase } from "./lib/supabase";
 import {
   acknowledgePendingScore,
   pendingScoresForEvent,
   savePendingScore,
 } from "./lib/offlineScores";
-import { createOrganizerDirectSync } from "./lib/directScoreSync";
+import { createOfflineOrganizerSync, createOrganizerDirectSync } from "./lib/directScoreSync";
 
 const playerName = (players, id) =>
   players.find((player) => player.id === id)?.full_name || "Unknown player";
@@ -71,9 +73,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     () => pendingScoresForEvent(event.id).length,
   );
   const [directConnections, setDirectConnections] = useState({});
+  const [offlinePairing, setOfflinePairing] = useState(null);
+  const [offlineAnswer, setOfflineAnswer] = useState("");
+  const [showOfflineScanner, setShowOfflineScanner] = useState(false);
   const scoreSaveChains = useRef({});
   const directSyncs = useRef(new Map());
+  const offlineSyncs = useRef(new Map());
   const gamesRef = useRef([]);
+  const courtDataRef = useRef({ players: [], gamePlayers: [], scores: {} });
   const teamSize = event.game_format === "singles" ? 1 : 2;
   const playersNeeded = teamSize * 2;
 
@@ -136,9 +143,18 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     gamesRef.current = games;
   }, [games]);
 
+  useEffect(() => {
+    courtDataRef.current = { players, gamePlayers, scores };
+    offlineSyncs.current.forEach((sync, courtId) =>
+      sync.sendView?.(buildOfflineCourtView(courtId)),
+    );
+  }, [players, gamePlayers, scores, games]);
+
   useEffect(() => () => {
     directSyncs.current.forEach((sync) => sync.close());
     directSyncs.current.clear();
+    offlineSyncs.current.forEach((sync) => sync.close());
+    offlineSyncs.current.clear();
   }, []);
 
   useEffect(() => {
@@ -492,12 +508,29 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   async function openScoringLink(court) {
     setMessage("");
+    const cacheKey = `pickleflow-scoring-access-${court.id}`;
+    const cached = JSON.parse(window.localStorage.getItem(cacheKey) || "null");
+    if (!navigator.onLine) {
+      if (!cached?.access_token)
+        return setMessage("Open this court’s scoring link once while online before pairing fully offline.");
+      const url = `${window.location.origin}/?score=${cached.access_token}`;
+      setScoringLink({ court, url, expiresAt: cached.expires_at });
+      return;
+    }
     const { data, error } = await supabase.rpc("create_court_scoring_access", {
       p_court_id: court.id,
     });
-    if (error) return setMessage(error.message);
+    if (error) {
+      if (cached?.access_token) {
+        const url = `${window.location.origin}/?score=${cached.access_token}`;
+        setScoringLink({ court, url, expiresAt: cached.expires_at });
+        return;
+      }
+      return setMessage(error.message);
+    }
     const access = data?.[0];
     const url = `${window.location.origin}/?score=${access.access_token}`;
+    window.localStorage.setItem(cacheKey, JSON.stringify(access));
     directSyncs.current.get(court.id)?.close();
     setDirectConnections((current) => ({ ...current, [court.id]: "waiting" }));
     const directSync = createOrganizerDirectSync({
@@ -508,6 +541,67 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     });
     directSyncs.current.set(court.id, directSync);
     setScoringLink({ court, url, expiresAt: access.expires_at });
+  }
+
+  function buildOfflineCourtView(courtId) {
+    const court = courts.find((item) => item.id === courtId);
+    if (!court) return null;
+    const { players: currentPlayers, gamePlayers: currentSlots, scores: currentScores } = courtDataRef.current;
+    const game = gamesRef.current.find((item) => item.court_id === courtId && item.status === "playing");
+    const nextGame = gamesRef.current.find((item) => item.court_id === courtId && item.status === "queued");
+    const shapeGame = (item, includeScore = false) => item ? {
+      id: item.id,
+      game_number: item.game_number,
+      points_to_win: item.points_to_win,
+      team_one_score: includeScore ? Number(currentScores[item.id]?.one ?? item.team_one_score ?? 0) : undefined,
+      team_two_score: includeScore ? Number(currentScores[item.id]?.two ?? item.team_two_score ?? 0) : undefined,
+      team_one: currentSlots.filter((slot) => slot.game_id === item.id && slot.team_number === 1).map((slot) => playerName(currentPlayers, slot.player_registration_id)),
+      team_two: currentSlots.filter((slot) => slot.game_id === item.id && slot.team_number === 2).map((slot) => playerName(currentPlayers, slot.player_registration_id)),
+    } : null;
+    return {
+      event_name: event.name,
+      court_name: court.name,
+      game: shapeGame(game, true),
+      next_game: shapeGame(nextGame),
+    };
+  }
+
+  async function beginOfflinePairing() {
+    if (!scoringLink?.court) return;
+    const court = scoringLink.court;
+    setMessage("");
+    setOfflineAnswer("");
+    setOfflinePairing({ court, status: "creating", offerUrl: "" });
+    offlineSyncs.current.get(court.id)?.close();
+    const sync = createOfflineOrganizerSync({
+      onScore: handleDirectScore,
+      getView: () => buildOfflineCourtView(court.id),
+      onStatus: (status) => {
+        setDirectConnections((current) => ({ ...current, [court.id]: status }));
+        setOfflinePairing((current) => current?.court.id === court.id ? { ...current, status } : current);
+      },
+    });
+    offlineSyncs.current.set(court.id, sync);
+    try {
+      const offer = await sync.createOffer();
+      const offerUrl = `${scoringLink.url}&offlineOffer=${encodeURIComponent(offer)}`;
+      setOfflinePairing({ court, status: "offer-ready", offerUrl });
+    } catch (error) {
+      setOfflinePairing({ court, status: "error", offerUrl: "" });
+      setMessage(`Offline pairing could not start: ${error.message}`);
+    }
+  }
+
+  async function acceptOfflineAnswer(value = offlineAnswer) {
+    if (!offlinePairing?.court || !value.trim()) return;
+    const sync = offlineSyncs.current.get(offlinePairing.court.id);
+    try {
+      await sync.acceptAnswer(value.trim());
+      setShowOfflineScanner(false);
+      setOfflineAnswer("");
+    } catch (error) {
+      setMessage(`The offline response could not be accepted: ${error.message}`);
+    }
   }
 
   async function copyScoringLink() {
@@ -1091,6 +1185,20 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             <div className={`direct-sync-callout ${directConnections[scoringLink.court.id] || "waiting"}`}>
               <Radio size={18} />
               <span><strong>Direct device sync</strong>{directConnections[scoringLink.court.id] === "connected" ? "Connected to scoring device" : directConnections[scoringLink.court.id] === "error" ? "Pairing unavailable · online scoring still works" : "Waiting for the scoring device to scan this QR"}</span>
+            </div>
+            <div className="offline-pairing-box">
+              <div><strong>Pair with no internet</strong><span>Both devices must be on the same Wi-Fi or hotspot.</span></div>
+              {!offlinePairing || offlinePairing.court.id !== scoringLink.court.id ? (
+                <button className="button button-secondary" type="button" onClick={beginOfflinePairing}><Radio size={17} /> Pair offline</button>
+              ) : offlinePairing.status === "creating" ? <p>Preparing secure local pairing…</p>
+                : offlinePairing.offerUrl ? <>
+                  <div className="offline-offer-qr"><QRCodeCanvas value={offlinePairing.offerUrl} size={260} level="L" marginSize={2} /><strong>1. Scan this on the scoring device</strong><span>It will display a response QR.</span></div>
+                  <div className="offline-answer-actions"><strong>2. Scan the response QR</strong><button className="button button-primary" type="button" onClick={() => setShowOfflineScanner(true)}><Camera size={17} /> Scan response</button></div>
+                  {showOfflineScanner && <QrScanner title="Scan scorer response" onClose={() => setShowOfflineScanner(false)} onResult={acceptOfflineAnswer} />}
+                  <label>Or paste the response code<input value={offlineAnswer} onChange={(event) => setOfflineAnswer(event.target.value)} placeholder="pickleflow-answer:…" /></label>
+                  <button className="button button-secondary" type="button" disabled={!offlineAnswer.trim()} onClick={() => acceptOfflineAnswer()}>Use response code</button>
+                </> : <button className="button button-secondary" type="button" onClick={beginOfflinePairing}>Try again</button>}
+              {offlinePairing?.court.id === scoringLink.court.id && offlinePairing.status === "connected" && <p className="offline-connected"><Check size={16} /> Fully offline connection established.</p>}
             </div>
             <div className="scorer-qr-wrap">
               <QRCodeCanvas

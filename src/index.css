@@ -1475,6 +1475,27 @@ select:focus {
 .direct-sync-callout span,
 .direct-sync-callout strong { display: block; }
 .direct-sync-callout strong { color: inherit; }
+.offline-pairing-box { display: grid; gap: 12px; margin-top: 10px; padding: 15px; border: 1px solid var(--border); border-radius: 15px; background: #f7fafb; }
+.offline-pairing-box > div:first-child { display: grid; gap: 3px; }
+.offline-pairing-box > div:first-child span { color: var(--muted); font-size: .78rem; }
+.offline-pairing-box > p { margin: 0; color: var(--muted); font-size: .84rem; }
+.offline-offer-qr { display: grid; justify-items: center; gap: 7px; padding: 13px; border-radius: 13px; background: white; text-align: center; }
+.offline-offer-qr canvas { max-width: 100%; height: auto !important; }
+.offline-offer-qr span { color: var(--muted); font-size: .78rem; }
+.offline-answer-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.offline-pairing-box label { display: grid; gap: 5px; color: var(--muted); font-size: .75rem; }
+.offline-connected { display: flex; align-items: center; gap: 7px; color: #27612c !important; font-weight: 900; }
+.offline-scanner { display: grid; gap: 10px; overflow: hidden; padding: 10px; border-radius: 14px; color: white; background: #071f29; }
+.offline-scanner header { display: flex; align-items: center; justify-content: space-between; }
+.offline-scanner header span { display: flex; align-items: center; gap: 7px; font-weight: 900; }
+.offline-scanner header button { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; color: white; background: rgba(255,255,255,.14); cursor: pointer; }
+.offline-scanner video { width: 100%; min-height: 220px; border-radius: 10px; object-fit: cover; background: black; }
+.offline-scanner p { margin: 0; color: #ffd0ca; font-size: .8rem; }
+.offline-response-card { width: min(560px, calc(100% - 32px)); display: grid; justify-items: center; gap: 12px; margin: 14px auto; padding: 22px; border: 1px solid #cbdbe2; border-radius: 20px; background: white; box-shadow: 0 14px 35px rgba(8,42,52,.12); text-align: center; }
+.offline-response-card h2, .offline-response-card p { margin: 0; }
+.offline-response-card canvas { max-width: 100%; height: auto !important; }
+.offline-response-card details { width: 100%; color: var(--muted); font-size: .78rem; }
+.offline-response-card textarea { width: 100%; min-height: 80px; margin-top: 8px; font-size: .68rem; }
 .direct-court-status {
   padding: 5px 7px;
   border-radius: 999px;
