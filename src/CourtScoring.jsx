@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clock3, Heart, Minus, Plus, Radio, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
+import { CircleDot, Clock3, Heart, Lock, Minus, Plus, Radio, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "./lib/supabase";
 import {
@@ -26,12 +26,19 @@ export default function CourtScoring({ token }) {
   const [directState, setDirectState] = useState("pairing");
   const [offlineAnswer, setOfflineAnswer] = useState("");
   const [offlineError, setOfflineError] = useState("");
+  const [servingTeam, setServingTeam] = useState(1);
   const syncTimer = useRef(null);
   const flushing = useRef(false);
   const directSync = useRef(null);
   const offlineSync = useRef(null);
   const activeGameId = view?.game?.id;
   const hasActiveGame = Boolean(activeGameId);
+
+  useEffect(() => {
+    if (!activeGameId) return;
+    const saved = Number(window.localStorage.getItem(`pickleflow-serving-${activeGameId}`));
+    setServingTeam(saved === 2 ? 2 : 1);
+  }, [activeGameId]);
 
   const applyPendingScore = useCallback((data) => {
     if (!data?.game) return data;
@@ -197,6 +204,7 @@ export default function CourtScoring({ token }) {
 
   function changeScore(team, delta) {
     if (!view?.game) return;
+    if (delta > 0 && team !== servingTeam) return;
     setView((currentView) => {
       if (!currentView?.game) return currentView;
       const game = currentView.game;
@@ -215,6 +223,12 @@ export default function CourtScoring({ token }) {
         syncTimer.current = window.setTimeout(() => flushPending(), 350);
       return nextView;
     });
+  }
+
+  function changeServingTeam(team) {
+    if (!activeGameId) return;
+    setServingTeam(team);
+    window.localStorage.setItem(`pickleflow-serving-${activeGameId}`, String(team));
   }
 
   if (loading) return <main className="court-scoring-page"><p>Loading court…</p></main>;
@@ -243,30 +257,28 @@ export default function CourtScoring({ token }) {
         <Radio size={17} />
         <span>{directState === "connected" ? "Direct to organizer · Connected" : directState === "unsupported" ? "Direct sync is not supported on this browser" : directState === "error" ? "Direct sync unavailable · online scoring remains active" : "Pairing directly with organizer…"}</span>
       </div>
-      {offlineAnswer && directState !== "connected" && <section className="offline-response-card">
-        <span className="eyebrow">Offline pairing · Step 2</span>
-        <h2>Scan this response on the organizer device</h2>
-        <QRCodeCanvas value={offlineAnswer} size={270} level="L" marginSize={2} />
-        <p>Keep this page open. The status above will change when the direct connection is ready.</p>
-        <details><summary>Response code fallback</summary><textarea readOnly value={offlineAnswer} onFocus={(event) => event.target.select()} /></details>
-      </section>}
       {offlineError && <div className="form-message error">Offline pairing failed: {offlineError}</div>}
       {message && <div className="form-message error">{message}</div>}
       {view.game ? (
         <section className="scorer-card">
           <span className="eyebrow">Live · Game {view.game.game_number}</span>
           <h1>First to {view.game.points_to_win}</h1>
+          <div className="serve-guide"><CircleDot size={17} /><span><strong>Team {servingTeam} is serving</strong> Tap “Set serve” when service changes.</span></div>
           <div className="scorer-teams">
             {[1, 2].map((team) => {
               const score = team === 1 ? view.game.team_one_score : view.game.team_two_score;
               const names = team === 1 ? view.game.team_one : view.game.team_two;
-              return <article key={team}>
+              const isServing = servingTeam === team;
+              return <article key={team} className={isServing ? "serving" : "receiving"}>
+                <button type="button" className="serve-toggle" onClick={() => changeServingTeam(team)} aria-pressed={isServing}>
+                  {isServing ? <><CircleDot size={15} /> Serving</> : <>Set serve</>}
+                </button>
                 <span>Team {team}</span>
                 <h2>{names.join(" & ")}</h2>
                 <strong>{score}</strong>
                 <div className="scorer-controls">
                   <button onClick={() => changeScore(team, -1)} disabled={score === 0} aria-label={`Subtract Team ${team} point`}><Minus /></button>
-                  <button onClick={() => changeScore(team, 1)} aria-label={`Add Team ${team} point`}><Plus /></button>
+                  <button onClick={() => changeScore(team, 1)} disabled={!isServing} aria-label={isServing ? `Add Team ${team} point` : `Team ${team} is not serving`} title={isServing ? "Add point" : "Only the serving team can score"}>{isServing ? <Plus /> : <Lock />}</button>
                 </div>
               </article>;
             })}
@@ -276,6 +288,13 @@ export default function CourtScoring({ token }) {
       ) : (
         <section className="scorer-empty"><Clock3 /><h1>Waiting for a match</h1><p>This screen will update when the organizer starts a game on {view.court_name}.</p><button className="button button-secondary" onClick={() => load()}><RefreshCw size={17} /> Refresh</button></section>
       )}
+      {offlineAnswer && directState !== "connected" && <section className="offline-response-card">
+        <span className="eyebrow">Offline pairing · Step 2</span>
+        <h2>Scan this response on the organizer device</h2>
+        <QRCodeCanvas value={offlineAnswer} size={270} level="L" marginSize={2} />
+        <p>Keep this page open. The connection status will update automatically.</p>
+        <details><summary>Response code fallback</summary><textarea readOnly value={offlineAnswer} onFocus={(event) => event.target.select()} /></details>
+      </section>}
       {view.next_game && <p className="scorer-next">Next: Game {view.next_game.game_number}</p>}
       <p className="scorer-note">Scores are saved on this device during a temporary connection loss and sync automatically when online.</p>
     </main>
