@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   MessageSquarePlus,
   Sparkles,
+  Swords,
   Trophy,
   UserPlus,
   Users,
