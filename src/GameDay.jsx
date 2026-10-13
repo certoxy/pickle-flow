@@ -81,6 +81,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const offlineSyncs = useRef(new Map());
   const gamesRef = useRef([]);
   const courtDataRef = useRef({ players: [], gamePlayers: [], scores: {} });
+  const courtViewInitialized = useRef(false);
   const teamSize = event.game_format === "singles" ? 1 : 2;
   const playersNeeded = teamSize * 2;
 
@@ -138,6 +139,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   useEffect(() => {
     load();
   }, [event.id]);
+
+  useEffect(() => {
+    if (courtViewInitialized.current || courts.length < 4) return;
+    courtViewInitialized.current = true;
+    setMonitoredCourt(courts[0]?.id || "");
+  }, [courts]);
 
   useEffect(() => {
     gamesRef.current = games;
@@ -1386,6 +1393,22 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           <span>Completed</span>
         </div>
       </div>
+      {courts.length > 0 && <section className="court-overview" aria-label="Court overview">
+        <div className="court-overview-heading"><strong>Court overview</strong><button type="button" onClick={() => setMonitoredCourt("")} className={!monitoredCourt ? "selected" : ""}>View all matches</button></div>
+        <div className="court-overview-list">
+          {courts.filter((court) => court.status !== "disabled").map((court) => {
+            const liveGame = playingGameForCourt(court.id);
+            const readyGame = activeGames.find((game) => game.court_id === court.id && game.status === "queued");
+            const liveScore = liveGame ? scores[liveGame.id] || { one: liveGame.team_one_score || 0, two: liveGame.team_two_score || 0 } : null;
+            return <button type="button" key={court.id} className={`court-overview-card ${monitoredCourt === court.id ? "selected" : ""} ${liveGame ? "playing" : readyGame ? "ready" : "available"}`} onClick={() => setMonitoredCourt(court.id)}>
+              <span>{court.name}</span>
+              {liveGame ? <><strong>{liveScore.one} <small>–</small> {liveScore.two}</strong><em>Game {liveGame.game_number} · Playing</em></>
+                : readyGame ? <><strong>Game {readyGame.game_number}</strong><em>Ready to start</em></>
+                  : <><strong>Available</strong><em>Waiting for match</em></>}
+            </button>;
+          })}
+        </div>
+      </section>}
       <div className="game-day-workspace">
         <div className="game-day-grid game-day-main">
         <section className="profile-card">

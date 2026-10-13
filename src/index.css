@@ -1524,6 +1524,23 @@ select:focus {
   opacity: 0.75;
   font-size: 0.78rem;
 }
+.court-overview { display: grid; gap: 10px; padding: 13px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,.74); }
+.court-overview-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.court-overview-heading strong { color: var(--navy); font-size: .9rem; }
+.court-overview-heading button { padding: 6px 10px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: white; cursor: pointer; font: inherit; font-size: .7rem; font-weight: 800; }
+.court-overview-heading button.selected { border-color: var(--blue); color: white; background: var(--blue); }
+.court-overview-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
+.court-overview-card { min-width: 0; display: grid; gap: 3px; padding: 11px 12px; border: 1px solid #d9e5e9; border-radius: 12px; color: var(--navy); background: white; cursor: pointer; text-align: left; transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.court-overview-card:hover { transform: translateY(-1px); border-color: #9abfcf; box-shadow: 0 7px 18px rgba(18,59,102,.08); }
+.court-overview-card.selected { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(38,119,166,.15); }
+.court-overview-card > span { overflow: hidden; color: var(--muted); font-size: .7rem; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
+.court-overview-card > strong { font-size: 1.1rem; line-height: 1.2; }
+.court-overview-card.playing > strong { color: var(--blue); font-size: 1.35rem; }
+.court-overview-card.ready > strong { color: #7a6210; }
+.court-overview-card > strong small { color: var(--muted); font-size: .8rem; }
+.court-overview-card > em { color: var(--muted); font-size: .66rem; font-style: normal; font-weight: 700; }
+.court-overview-card.playing { border-left: 4px solid #75be42; }
+.court-overview-card.ready { border-left: 4px solid #ffd84d; }
 .game-day-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3105,6 +3122,10 @@ select:focus-visible {
   .game-day-summary strong {
     font-size: 1.25rem;
   }
+  .court-overview { padding: 11px; }
+  .court-overview-list { display: flex; overflow-x: auto; padding-bottom: 3px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .court-overview-list::-webkit-scrollbar { display: none; }
+  .court-overview-card { flex: 0 0 150px; scroll-snap-align: start; }
   .game-day-main > section:first-child {
     order: 2;
   }
