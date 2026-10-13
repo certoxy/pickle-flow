@@ -5,6 +5,7 @@ import {
   Clock3,
   Copy,
   Download,
+  Edit3,
   ExternalLink,
   Link,
   MonitorUp,
@@ -31,6 +32,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [games, setGames] = useState([]);
   const [gamePlayers, setGamePlayers] = useState([]);
   const [courtName, setCourtName] = useState("");
+  const [editingCourtId, setEditingCourtId] = useState(null);
+  const [editingCourtName, setEditingCourtName] = useState("");
+  const [savingCourtName, setSavingCourtName] = useState(false);
   const [selectedCourt, setSelectedCourt] = useState("");
   const [monitoredCourt, setMonitoredCourt] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState([]);
@@ -397,6 +401,40 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           item.id === court.id ? { ...item, status } : item,
         ),
       );
+  }
+
+  function beginCourtRename(court) {
+    setMessage("");
+    setEditingCourtId(court.id);
+    setEditingCourtName(court.name);
+  }
+
+  function cancelCourtRename() {
+    setEditingCourtId(null);
+    setEditingCourtName("");
+  }
+
+  async function renameCourt(e, court) {
+    e.preventDefault();
+    const name = editingCourtName.trim();
+    if (!name || savingCourtName) return;
+    setSavingCourtName(true);
+    setMessage("");
+    const { error } = await supabase
+      .from("event_courts")
+      .update({ name })
+      .eq("id", court.id)
+      .eq("event_id", event.id);
+    setSavingCourtName(false);
+    if (error) {
+      setMessage(error.code === "23505" ? "Another court already uses that name." : error.message);
+      return;
+    }
+    setCourts(courts.map((item) => item.id === court.id ? { ...item, name } : item));
+    if (scoringLink?.court.id === court.id)
+      setScoringLink({ ...scoringLink, court: { ...scoringLink.court, name } });
+    cancelCourtRename();
+    setMessage(`Court renamed to ${name}.`);
   }
 
   async function openScoringLink(court) {
@@ -1384,10 +1422,17 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             <div className="court-list">
               {courts.map((court) => (
                 <div className="court-access-item" key={court.id}>
-                  <button className={`court-chip ${court.status}`} disabled={court.status === "in_use"} onClick={() => toggleCourt(court)}>
-                    {court.name}<span>{court.status.replace("_", " ")}</span>
-                  </button>
-                  <button className="court-link-button" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
+                  {editingCourtId === court.id ? <form className="court-rename-form" onSubmit={(e) => renameCourt(e, court)}>
+                    <input autoFocus required aria-label={`Rename ${court.name}`} value={editingCourtName} onChange={(e) => setEditingCourtName(e.target.value)} maxLength="80" />
+                    <button type="submit" className="court-icon-button save" disabled={savingCourtName || !editingCourtName.trim()} aria-label="Save court name" title="Save"><Check size={17} /></button>
+                    <button type="button" className="court-icon-button" onClick={cancelCourtRename} disabled={savingCourtName} aria-label="Cancel court rename" title="Cancel"><X size={17} /></button>
+                  </form> : <>
+                    <button className={`court-chip ${court.status}`} disabled={court.status === "in_use"} onClick={() => toggleCourt(court)}>
+                      {court.name}<span>{court.status.replace("_", " ")}</span>
+                    </button>
+                    <button className="court-icon-button" onClick={() => beginCourtRename(court)} aria-label={`Edit ${court.name} name`} title="Edit court name"><Edit3 size={17} /></button>
+                    <button className="court-link-button" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
+                  </>}
                 </div>
               ))}
               {!courts.length && (

@@ -2804,7 +2804,7 @@ select:focus-visible {
   gap: 6px;
 }
 .court-access-item .court-chip { flex: 1; }
-.court-link-button {
+.court-link-button,.court-icon-button {
   width: 40px;
   border: 1px solid #d8e1e8;
   border-radius: 10px;
@@ -2812,7 +2812,10 @@ select:focus-visible {
   color: var(--blue);
   cursor: pointer;
 }
-.court-link-button:hover { background: #eef8ff; }
+.court-link-button:hover,.court-icon-button:hover { background: #eef8ff; }
+.court-icon-button { border:1px solid #d8e1e8; border-radius:10px; background:#fff; color:var(--navy); cursor:pointer; }
+.court-icon-button.save { color:#4c7110; }.court-icon-button:disabled { opacity:.5; cursor:not-allowed; }
+.court-rename-form { display:grid; grid-template-columns:minmax(150px,1fr) 40px 40px; gap:6px; margin:0; }.court-rename-form input { min-width:0; margin:0; padding:10px 11px; }
 .scorer-link-dialog input { width: 100%; }
 .scorer-qr-wrap {
   display: grid;
