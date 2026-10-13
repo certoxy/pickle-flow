@@ -1008,15 +1008,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     );
   return (
     <section className="game-day-page">
-      {displayLink && <div className="modal-backdrop"><section className="game-complete-dialog scorer-link-dialog" role="dialog" aria-modal="true">
+      {displayLink && createPortal(<div className="modal-backdrop viewport-top-backdrop"><section className="game-complete-dialog scorer-link-dialog" role="dialog" aria-modal="true">
         <span className="dialog-icon"><MonitorUp size={25} /></span><span className="eyebrow">Smart TV display</span>
         <h2>Event Match Board</h2><p className="muted">Open this link on the club TV. It updates automatically and remains valid for 7 days.</p>
         <div className="scorer-qr-wrap"><QRCodeCanvas id="event-display-qr" value={displayLink.url} size={220} level="H" marginSize={2} title="Match Board QR code" /><strong>Scan to open Match Board</strong><span>Valid for 7 days</span></div>
         <input readOnly value={displayLink.url} onFocus={(e) => e.target.select()} />
         <div className="dialog-actions"><button className="button button-secondary" onClick={() => setDisplayLink(null)}>Close</button><button className="button button-secondary" onClick={downloadDisplayQr}><Download size={17} /> QR code</button><button className="button button-secondary" onClick={() => window.open(displayLink.url, "_blank", "noopener,noreferrer")}><ExternalLink size={17} /> Open board</button><button className="button button-primary" onClick={copyDisplayLink}><Copy size={17} /> Copy link</button></div>
-      </section></div>}
-      {scoringLink && (
-        <div className="modal-backdrop">
+      </section></div>, document.body)}
+      {scoringLink && createPortal(
+        <div className="modal-backdrop viewport-top-backdrop">
           <section className="game-complete-dialog scorer-link-dialog" role="dialog" aria-modal="true" aria-labelledby="scorer-link-title">
             <span className="dialog-icon"><Link size={25} /></span>
             <span className="eyebrow">Temporary umpire access</span>
@@ -1042,10 +1042,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               <button className="button button-primary" onClick={copyScoringLink}><Copy size={17} /> Copy link</button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body,
       )}
       {completionPrompt && createPortal(
-        <div className="modal-backdrop game-completion-backdrop">
+        <div className="modal-backdrop viewport-top-backdrop">
           <section
             className="game-complete-dialog"
             role="dialog"
