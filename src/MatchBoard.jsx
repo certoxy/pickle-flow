@@ -32,6 +32,8 @@ export default function MatchBoard({ token }) {
       if (court.next_game && before?.next_game?.game_number !== court.next_game.game_number)
         speak(`Next match on ${court.name}. Game ${court.next_game.game_number}. ${names(court.next_game.team_one)}, versus ${names(court.next_game.team_two)}. Please get ready.`);
     });
+    if (next.next_match && previous.next_match?.game_number !== next.next_match.game_number)
+      speak(`Next match. Game ${next.next_match.game_number}. ${names(next.next_match.team_one)}, versus ${names(next.next_match.team_two)}. Court assignment is pending.`);
     const previousGames = new Set(previous.recent_games.map((game) => game.game_number));
     [...next.recent_games].reverse().forEach((game) => {
       if (!previousGames.has(game.game_number))
@@ -113,6 +115,11 @@ export default function MatchBoard({ token }) {
       </article>)}
       {!board.courts.length && <div className="tv-no-courts">No active courts</div>}
     </section>
+    {board.next_match && <section className="tv-next-match">
+      <div><Clock3 /><span>UP NEXT · COURT PENDING</span></div>
+      <strong>Game {board.next_match.game_number}</strong>
+      <p>{names(board.next_match.team_one)} <b>vs</b> {names(board.next_match.team_two)}</p>
+    </section>}
     <section className="tv-lower">
       <article className="tv-queue"><h2><Users /> Player Queue <span>{board.waiting.length}</span></h2><div>{board.waiting.length ? board.waiting.slice(0, 12).map((player) => <span key={`${player.position}-${player.name}`}><b>{player.position}</b>{player.name}</span>) : <p>No players waiting</p>}</div></article>
       <article className="tv-winners"><h2><Trophy /> Recent Winners</h2><div>{board.recent_games.length ? board.recent_games.map((game) => <span key={game.game_number}><b>Game {game.game_number} · {game.court_name}</b><strong>{names(game.winners)}</strong><em>{game.team_one_score}–{game.team_two_score}</em></span>) : <p>Completed games will appear here</p>}</div></article>
