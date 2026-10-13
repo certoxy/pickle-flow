@@ -17,10 +17,17 @@ import {
   Trophy,
   UserCheck,
   Users,
+  Wifi,
+  WifiOff,
   X,
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "./lib/supabase";
+import {
+  acknowledgePendingScore,
+  pendingScoresForEvent,
+  savePendingScore,
+} from "./lib/offlineScores";
 
 const playerName = (players, id) =>
   players.find((player) => player.id === id)?.full_name || "Unknown player";
@@ -55,6 +62,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     skill_level: "beginner",
   });
   const [addingPlayer, setAddingPlayer] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+  const [syncState, setSyncState] = useState("synced");
+  const [pendingScoreCount, setPendingScoreCount] = useState(
+    () => pendingScoresForEvent(event.id).length,
+  );
   const scoreSaveChains = useRef({});
   const teamSize = event.game_format === "singles" ? 1 : 2;
   const playersNeeded = teamSize * 2;
@@ -96,22 +108,41 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setQueue(queueResult.data || []);
     setGames(loadedGames);
     setGamePlayers(participantResult.data || []);
-    setScores(
-      Object.fromEntries(
-        loadedGames.map((game) => [
-          game.id,
-          {
+    const pending = pendingScoresForEvent(event.id);
+    setPendingScoreCount(pending.length);
+    setScores(Object.fromEntries(loadedGames.map((game) => {
+      const local = pending.find((entry) => entry.gameId === game.id);
+      return [game.id, local
+        ? { one: local.one, two: local.two }
+        : {
             one: Number(game.team_one_score || 0),
             two: Number(game.team_two_score || 0),
-          },
-        ]),
-      ),
-    );
+          }];
+    })));
     setLoading(false);
   }
 
   useEffect(() => {
     load();
+  }, [event.id]);
+
+  useEffect(() => {
+    const handleOffline = () => {
+      setIsOnline(false);
+      setSyncState("offline");
+    };
+    const handleOnline = () => {
+      setIsOnline(true);
+      flushPendingScores();
+    };
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+    if (navigator.onLine && pendingScoresForEvent(event.id).length)
+      flushPendingScores();
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
   }, [event.id]);
 
   useEffect(() => {
@@ -145,13 +176,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 )
               : [nextGame, ...current];
           });
-          setScores((current) => ({
-            ...current,
-            [nextGame.id]: {
-              one: Number(nextGame.team_one_score || 0),
-              two: Number(nextGame.team_two_score || 0),
-            },
-          }));
+          if (!pendingScoresForEvent(event.id).some((entry) => entry.gameId === nextGame.id))
+            setScores((current) => ({
+              ...current,
+              [nextGame.id]: {
+                one: Number(nextGame.team_one_score || 0),
+                two: Number(nextGame.team_two_score || 0),
+              },
+            }));
           const one = Number(nextGame.team_one_score || 0);
           const two = Number(nextGame.team_two_score || 0);
           if (
@@ -757,7 +789,61 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setSubstitutePlayerId("");
   }
 
+  async function syncPendingScore(entry) {
+    if (!navigator.onLine) return false;
+    setSyncState("syncing");
+    const { error } = await supabase
+      .from("games")
+      .update({
+        team_one_score: Number(entry.one || 0),
+        team_two_score: Number(entry.two || 0),
+      })
+      .eq("id", entry.gameId)
+      .eq("event_id", event.id)
+      .eq("status", "playing");
+    if (error) {
+      setSyncState("error");
+      setMessage(`Score saved on this device and will retry: ${error.message}`);
+      return false;
+    }
+    acknowledgePendingScore(entry);
+    const remaining = pendingScoresForEvent(event.id).length;
+    setPendingScoreCount(remaining);
+    setSyncState(remaining ? "syncing" : "synced");
+    return true;
+  }
+
+  async function flushPendingScores() {
+    if (!navigator.onLine) return false;
+    const pending = pendingScoresForEvent(event.id);
+    if (!pending.length) {
+      setPendingScoreCount(0);
+      setSyncState("synced");
+      return true;
+    }
+    setSyncState("syncing");
+    for (const entry of pending) {
+      const synced = await syncPendingScore(entry);
+      if (!synced) return false;
+    }
+    return true;
+  }
+
   async function completeGame(game, scoreOverride) {
+    if (!navigator.onLine) {
+      setMessage(
+        "You are offline. The score is safe on this device, but reconnect before completing the game.",
+      );
+      return false;
+    }
+    await (scoreSaveChains.current[game.id] || Promise.resolve());
+    if (pendingScoresForEvent(event.id).some((entry) => entry.gameId === game.id)) {
+      const synced = await flushPendingScores();
+      if (!synced) {
+        setMessage("Please wait for the final score to sync before completing the game.");
+        return false;
+      }
+    }
     const score = scoreOverride || scores[game.id] || { one: 0, two: 0 };
     const one = Number(score.one),
       two = Number(score.two);
@@ -883,19 +969,19 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         ...current,
         [key]: Math.max(0, Number(current[key] || 0) + change),
       };
-      const saveScore = async () => {
-        const { error } = await supabase
-          .from("games")
-          .update({
-            team_one_score: Number(next.one || 0),
-            team_two_score: Number(next.two || 0),
-          })
-          .eq("id", game.id);
-        if (error) setMessage(`Score could not be saved: ${error.message}`);
-      };
+      const entry = savePendingScore({
+        mode: "organizer",
+        eventId: event.id,
+        gameId: game.id,
+        one: next.one,
+        two: next.two,
+      });
+      setPendingScoreCount(pendingScoresForEvent(event.id).length);
+      setSyncState(navigator.onLine ? "syncing" : "offline");
+      setIsOnline(navigator.onLine);
       scoreSaveChains.current[game.id] = (
         scoreSaveChains.current[game.id] || Promise.resolve()
-      ).then(saveScore);
+      ).then(() => syncPendingScore(entry));
       const one = Number(next.one || 0),
         two = Number(next.two || 0);
       if (Math.max(one, two) >= game.points_to_win && one !== two)
@@ -1087,6 +1173,18 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           <h2>{event.name}</h2>
         </div>
         <div className="game-day-title-actions"><button className="button button-secondary" onClick={openDisplayLink}><MonitorUp size={16} /> Match Board</button><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
+      </div>
+      <div className={`score-sync-status ${!isOnline ? "offline" : syncState}`} role="status">
+        {!isOnline ? <WifiOff size={17} /> : <Wifi size={17} />}
+        <span>
+          {!isOnline
+            ? `Offline · ${pendingScoreCount} score ${pendingScoreCount === 1 ? "change" : "changes"} pending`
+            : syncState === "syncing"
+              ? `Syncing ${pendingScoreCount} score ${pendingScoreCount === 1 ? "change" : "changes"}…`
+              : syncState === "error"
+                ? `${pendingScoreCount} score ${pendingScoreCount === 1 ? "change" : "changes"} saved on this device`
+                : "Online · Scores synced"}
+        </span>
       </div>
       {message && <div className="form-message game-message">{message}</div>}
       <div className="game-day-summary">
