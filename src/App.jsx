@@ -972,8 +972,9 @@ function TermsStep({ onAccept, onCancel }) {
       <div className="retention-alert">
         <strong>72-hour data retention</strong>
         <span>
-          PickleFlow will permanently delete the event and its associated
-          player and game data 72 hours after the event is completed.
+          PickleFlow will permanently delete player, contact, queue, and game
+          data 72 hours after the event date. A summary containing only the
+          event name, date, player count, and game count will remain.
         </span>
       </div>
       <div className="terms-copy">
@@ -1258,7 +1259,7 @@ function EventForm({
   );
 }
 
-function EventList({ events, onSelect, onNew, allowance, onUpgrade }) {
+function EventList({ events, archives, onSelect, onNew, allowance, onUpgrade }) {
   async function copyLink(code) {
     await navigator.clipboard.writeText(
       `${window.location.origin}/?event=${code}`,
@@ -1323,6 +1324,33 @@ function EventList({ events, onSelect, onNew, allowance, onUpgrade }) {
             </article>
           ))}
         </div>
+      )}
+      {archives.length > 0 && (
+        <section className="event-history">
+          <div className="section-title">
+            <div>
+              <span className="eyebrow">Retained summaries</span>
+              <h2>Event history</h2>
+            </div>
+          </div>
+          <p className="muted">Player details, contacts, queues, and game records have been permanently deleted.</p>
+          <div className="event-grid archive-grid">
+            {archives.map((item) => (
+              <article className="event-card archive-card" key={item.id}>
+                <div className="event-card-top">
+                  <span className="status-badge archived">Archived</span>
+                  <span className="event-code">Summary only</span>
+                </div>
+                <h3>{item.event_name}</h3>
+                <p><CalendarDays size={15} /> {new Date(`${item.event_date}T00:00:00`).toLocaleDateString()}</p>
+                <div className="archive-counts">
+                  <span><Users size={16} /><strong>{item.player_count}</strong> players</span>
+                  <span><Swords size={16} /><strong>{item.game_count}</strong> games</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
     </section>
   );
@@ -1776,7 +1804,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           <span>
             {event.retention_extended_until
               ? "Administrator-approved extended retention date."
-              : "Event, player, and game data are deleted 72 hours after event completion."}
+              : "Personal and operational data are deleted 72 hours after the event date; summary totals remain."}
           </span>
         </div>
         {request?.status === "pending" ? (
@@ -2023,6 +2051,7 @@ function Dashboard({ session }) {
   const dashboardStateKey = `pickleflow-dashboard-${session.user.id}`;
   const [profile, setProfile] = useState(emptyProfile),
     [events, setEvents] = useState([]),
+    [archives, setArchives] = useState([]),
     [view, setView] = useState("events"),
     [selectedEvent, setSelectedEvent] = useState(null),
     [termsAcceptedAt, setTermsAcceptedAt] = useState(null),
@@ -2031,11 +2060,13 @@ function Dashboard({ session }) {
     [saved, setSaved] = useState(""),
     [loading, setLoading] = useState(true);
   async function loadEvents() {
-    const [eventResult, allowanceResult] = await Promise.all([
+    const [eventResult, archiveResult, allowanceResult] = await Promise.all([
       supabase.from("events").select("*").eq("organizer_user_id", session.user.id).order("event_date", { ascending: false }),
+      supabase.from("event_archives").select("*").eq("organizer_user_id", session.user.id).order("event_date", { ascending: false }),
       supabase.rpc("active_event_allowance", { target_user_id: session.user.id }),
     ]);
     setEvents(eventResult.data || []);
+    setArchives(archiveResult.data || []);
     if (allowanceResult.data?.[0]) setAllowance(allowanceResult.data[0]);
   }
   useEffect(() => {
@@ -2050,13 +2081,19 @@ function Dashboard({ session }) {
         .select("*")
         .eq("organizer_user_id", session.user.id)
         .order("event_date", { ascending: false }),
+      supabase
+        .from("event_archives")
+        .select("*")
+        .eq("organizer_user_id", session.user.id)
+        .order("event_date", { ascending: false }),
       supabase.rpc("active_event_allowance", { target_user_id: session.user.id }),
       supabase.rpc("is_platform_admin"),
-    ]).then(([profileResult, eventResult, allowanceResult, adminResult]) => {
+    ]).then(([profileResult, eventResult, archiveResult, allowanceResult, adminResult]) => {
       const loadedEvents = eventResult.data || [];
       if (profileResult.data)
         setProfile({ ...emptyProfile, ...profileResult.data });
       setEvents(loadedEvents);
+      setArchives(archiveResult.data || []);
       if (allowanceResult.data?.[0]) setAllowance(allowanceResult.data[0]);
       setIsAdmin(Boolean(adminResult.data));
       try {
@@ -2142,6 +2179,7 @@ function Dashboard({ session }) {
       {view === "events" && (
         <EventList
           events={events}
+          archives={archives}
           onSelect={(item) => {
             setSelectedEvent(item);
             setView("players");
