@@ -45,13 +45,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [editingCourtId, setEditingCourtId] = useState(null);
   const [editingCourtName, setEditingCourtName] = useState("");
   const [savingCourtName, setSavingCourtName] = useState(false);
-  const [selectedCourt, setSelectedCourt] = useState("");
   const [monitoredCourt, setMonitoredCourt] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [scores, setScores] = useState({});
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [autoAssigning, setAutoAssigning] = useState(false);
+  const [autoPlacingMatch, setAutoPlacingMatch] = useState(false);
   const [autoQueueing, setAutoQueueing] = useState(false);
   const [completionPrompt, setCompletionPrompt] = useState(null);
   const [completingGame, setCompletingGame] = useState(false);
@@ -254,17 +254,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     activeGames.find(
       (game) => game.court_id === courtId && game.status === "playing",
     );
-  const queuedGameForCourt = (courtId) =>
-    activeGames.find(
-      (game) => game.court_id === courtId && game.status === "queued",
-    );
+  const unassignedQueuedGames = activeGames
+    .filter((game) => game.status === "queued" && !game.court_id)
+    .sort((a, b) => a.game_number - b.game_number);
   const courtCanAcceptMatch = (court) =>
-    court.status === "available" ||
-    (court.status === "in_use" &&
-      Boolean(playingGameForCourt(court.id)) &&
-      !queuedGameForCourt(court.id));
+    court.status === "available" && !playingGameForCourt(court.id);
   const isNextMatch = (game) =>
-    game.status === "queued" && Boolean(playingGameForCourt(game.court_id));
+    game.status === "queued" && !game.court_id;
   const standings = useMemo(
     () =>
       checkedIn
@@ -349,17 +345,16 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       !event.auto_assign_next_players ||
       autoAssigning ||
       autoQueueing ||
-      availableCheckedInNotQueued.length
+      availableCheckedInNotQueued.length ||
+      unassignedQueuedGames.length
     )
       return;
-    const court = courts.find(courtCanAcceptMatch);
-    if (!court || waiting.length < playersNeeded) return;
+    if (waiting.length < playersNeeded) return;
     setAutoAssigning(true);
     createMatchFor(
       waiting
         .slice(0, playersNeeded)
         .map((entry) => entry.player_registration_id),
-      court.id,
       true,
     ).finally(() => setAutoAssigning(false));
   }, [
@@ -371,6 +366,16 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     autoAssigning,
     autoQueueing,
   ]);
+
+  useEffect(() => {
+    if (autoPlacingMatch || !unassignedQueuedGames.length) return;
+    const court = courts.find(courtCanAcceptMatch);
+    if (!court) return;
+    setAutoPlacingMatch(true);
+    assignMatchToCourt(unassignedQueuedGames[0], court).finally(() =>
+      setAutoPlacingMatch(false),
+    );
+  }, [courts, games, autoPlacingMatch]);
 
   async function updateEventSettings(field, value) {
     const payload = {
@@ -648,22 +653,46 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     );
   }
 
-  async function createMatchFor(playerIds, courtId, automatic = false) {
-    setMessage("");
-    if (!courtId) {
-      setMessage("Select an available court.");
+  async function assignMatchToCourt(game, court) {
+    const { error } = await supabase
+      .from("games")
+      .update({ court_id: court.id })
+      .eq("id", game.id)
+      .is("court_id", null);
+    if (error) {
+      setMessage(`The next match could not be assigned: ${error.message}`);
       return false;
     }
+    await supabase
+      .from("event_courts")
+      .update({ status: "in_use" })
+      .eq("id", court.id);
+    setGames((current) =>
+      current.map((item) =>
+        item.id === game.id ? { ...item, court_id: court.id } : item,
+      ),
+    );
+    setCourts((current) =>
+      current.map((item) =>
+        item.id === court.id ? { ...item, status: "in_use" } : item,
+      ),
+    );
+    setMessage(
+      `Game ${game.game_number} is ready on ${court.name}. Start when the players are on court.`,
+    );
+    return true;
+  }
+
+  async function createMatchFor(playerIds, automatic = false) {
+    setMessage("");
     if (playerIds.length !== playersNeeded) {
       setMessage(`Select exactly ${playersNeeded} players.`);
       return false;
     }
-    const court = courts.find((item) => item.id === courtId);
-    if (!court || !courtCanAcceptMatch(court)) {
-      setMessage("That court already has a current and next match.");
+    if (unassignedQueuedGames.length) {
+      setMessage("A next match is already paired and waiting for a court.");
       return false;
     }
-    const creatingNextMatch = Boolean(playingGameForCourt(courtId));
     const gameNumber = games.length
       ? Math.max(...games.map((game) => game.game_number)) + 1
       : 1;
@@ -671,7 +700,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .from("games")
       .insert({
         event_id: event.id,
-        court_id: courtId,
+        court_id: null,
         game_number: gameNumber,
         format: event.game_format,
         points_to_win: event.points_to_win,
@@ -697,10 +726,6 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     }
     await Promise.all([
       supabase
-        .from("event_courts")
-        .update({ status: "in_use" })
-        .eq("id", courtId),
-      supabase
         .from("game_queue")
         .update({ status: "assigned" })
         .eq("event_id", event.id)
@@ -708,11 +733,6 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     ]);
     setGames([game, ...games]);
     setGamePlayers([...gamePlayers, ...(inserted || [])]);
-    setCourts(
-      courts.map((court) =>
-        court.id === courtId ? { ...court, status: "in_use" } : court,
-      ),
-    );
     setQueue(
       queue.map((entry) =>
         playerIds.includes(entry.player_registration_id)
@@ -721,18 +741,19 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       ),
     );
     setSelectedPlayers([]);
-    setSelectedCourt("");
     if (automatic)
       setMessage(
-        creatingNextMatch
-          ? `Game ${gameNumber} automatically assigned as the next match for ${court.name}.`
-          : `Game ${gameNumber} automatically assigned and ready to start.`,
+        `Game ${gameNumber} was paired and added to Next Match. It will be assigned when a court is available.`,
+      );
+    else
+      setMessage(
+        `Game ${gameNumber} was paired and added to Next Match.`,
       );
     return true;
   }
 
   async function createMatch() {
-    await createMatchFor(selectedPlayers, selectedCourt);
+    await createMatchFor(selectedPlayers);
   }
 
   async function startGame(game) {
@@ -926,13 +947,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       setMessage(error.message);
       return false;
     }
-    const nextMatch = games.find(
-      (item) =>
-        item.id !== game.id &&
-        item.court_id === game.court_id &&
-        item.status === "queued",
-    );
-    const nextCourtStatus = nextMatch ? "in_use" : "available";
+    const nextCourtStatus = "available";
     await supabase
       .from("event_courts")
       .update({ status: nextCourtStatus })
@@ -994,9 +1009,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       ),
     );
     setMessage(
-      nextMatch
-        ? `Game ${game.game_number} recorded. Game ${nextMatch.game_number} is next on this court.`
-        : game.format === "open_play"
+      game.format === "open_play"
           ? `Game ${game.game_number} recorded. All four players returned to the back of the queue.`
           : `Game ${game.game_number} recorded. Players can be added back to the queue.`,
     );
@@ -1329,20 +1342,6 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 Select next four players
               </button>
             )}
-            <select
-              value={selectedCourt}
-              onChange={(e) => setSelectedCourt(e.target.value)}
-            >
-              <option value="">Select court slot</option>
-              {courts.filter(courtCanAcceptMatch).map((court) => (
-                <option key={court.id} value={court.id}>
-                  {court.name}
-                  {playingGameForCourt(court.id)
-                    ? " · Next match"
-                    : " · Play now"}
-                </option>
-              ))}
-            </select>
             <button
               className="button button-primary"
               onClick={createMatch}
@@ -1353,8 +1352,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             </button>
             <small>
               {event.game_format === "open_play"
-                ? "Queue order assigns the first two to Team 1 and the next two to Team 2. Each court can hold one next match."
-                : "Selection order assigns Team 1, then Team 2. Each court can hold one next match."}
+                ? "Queue order assigns the first two to Team 1 and the next two to Team 2. The pairing waits in Next Match until a court opens."
+                : "Selection order assigns Team 1, then Team 2. The pairing waits in Next Match until a court opens."}
             </small>
           </div>
         </section>
@@ -1386,12 +1385,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   <strong>
                     Game {game.game_number} ·{" "}
                     {courts.find((court) => court.id === game.court_id)?.name ||
-                      "Court"}
+                      "Waiting for a court"}
                   </strong>
                   <span
                     className={`status-badge ${isNextMatch(game) ? "next-match" : game.status}`}
                   >
-                    {isNextMatch(game) ? "Next match" : game.status}
+                    {isNextMatch(game) ? "Next match · Unassigned" : game.status}
                   </span>
                 </div>
                 <div className="teams">
@@ -1447,10 +1446,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   <button
                     className="button button-primary button-full"
                     onClick={() => startGame(game)}
-                    disabled={isNextMatch(game)}
+                    disabled={!game.court_id}
                   >
                     <Play size={16} />
-                    {isNextMatch(game) ? "Waiting for court" : "Start game"}
+                    {!game.court_id ? "Waiting for an available court" : "Start game"}
                   </button>
                 ) : (
                   <div className="live-score">
@@ -1550,8 +1549,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               <span>
                 <strong>Auto-assign next players</strong>
                 <small>
-                  Automatically create the next match when enough players and a
-                  court are available.
+                  Pair the next waiting players first, then assign them when a
+                  court becomes available.
                 </small>
               </span>
             </label>
