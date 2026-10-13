@@ -2518,7 +2518,7 @@ function PublicRegistration({ code, onHome }) {
             </div>
             <iframe
               title="Pinned event location preview"
-              src={`https://www.google.com/maps?q=${event.location_lat},${event.location_lng}&z=16&output=embed`}
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(event.location_lng) - 0.006}%2C${Number(event.location_lat) - 0.004}%2C${Number(event.location_lng) + 0.006}%2C${Number(event.location_lat) + 0.004}&layer=mapnik&marker=${event.location_lat}%2C${event.location_lng}`}
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />
