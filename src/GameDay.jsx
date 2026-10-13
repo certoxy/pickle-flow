@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   Check,
@@ -1043,8 +1044,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </section>
         </div>
       )}
-      {completionPrompt && (
-        <div className="modal-backdrop">
+      {completionPrompt && createPortal(
+        <div className="modal-backdrop game-completion-backdrop">
           <section
             className="game-complete-dialog"
             role="dialog"
@@ -1100,7 +1101,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               </button>
             </div>
           </section>
-        </div>
+        </div>,
+        document.body,
       )}
       {substitutionPrompt && (
         <div className="modal-backdrop">
