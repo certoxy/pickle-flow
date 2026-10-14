@@ -1536,6 +1536,11 @@ select:focus {
   .game-day-workspace {
     grid-template-columns: minmax(380px, .82fr) minmax(280px, .59fr) minmax(280px, .59fr);
   }
+  .game-day-workspace .queue-list,
+  .game-day-workspace .result-list {
+    max-height: none;
+    overflow: visible;
+  }
 }
 .direct-score-status {
   margin: 0 0 14px 8px;
