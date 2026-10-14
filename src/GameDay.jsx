@@ -17,6 +17,7 @@ import {
   Radio,
   RefreshCw,
   RotateCcw,
+  Settings2,
   Swords,
   Trophy,
   UserCheck,
@@ -79,7 +80,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [offlineAnswer, setOfflineAnswer] = useState("");
   const [showOfflineScanner, setShowOfflineScanner] = useState(false);
   const [showPageTour, setShowPageTour] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
   const scoreSaveChains = useRef({});
   const directSyncs = useRef(new Map());
   const offlineSyncs = useRef(new Map());
@@ -1369,7 +1370,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </span>
           <h2>{event.name}</h2>
         </div>
-        <div className="game-day-title-actions"><button className="page-guide-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={17} /> Guide</button><button className="button button-secondary" data-tour="match-board" onClick={openDisplayLink}><MonitorUp size={16} /> Match Board</button><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
+        <div className="game-day-title-actions"><button className="page-guide-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={17} /> Guide</button><button className="button button-secondary" data-tour="game-settings" onClick={() => setShowSettings(true)}><Settings2 size={16} /> Game Settings</button><button className="button button-secondary" data-tour="match-board" onClick={openDisplayLink}><MonitorUp size={16} /> Match Board</button><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
       </div>
       <div className={`score-sync-status ${!isOnline ? "offline" : syncState}`} role="status">
         {!isOnline ? <WifiOff size={17} /> : <Wifi size={17} />}
@@ -1642,12 +1643,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         </section>
         </div>
         <div className="game-day-grid game-day-management">
-          <details
-          className="profile-card game-settings"
-          open={settingsOpen}
-          onToggle={(event) => setSettingsOpen(event.currentTarget.open)}
-        >
-          <summary>Game settings & courts</summary>
+          {showSettings && createPortal(<div className="modal-backdrop viewport-top-backdrop" role="presentation" onMouseDown={() => setShowSettings(false)}>
+          <section className="game-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="game-settings-title" onMouseDown={(event) => event.stopPropagation()}>
+          <header><div><span className="eyebrow">Game Day setup</span><h2 id="game-settings-title"><Settings2 size={21} /> Game settings & courts</h2></div><button type="button" onClick={() => setShowSettings(false)} aria-label="Close game settings"><X /></button></header>
           <div className="settings-content">
             <div className="form-row">
               <label>
@@ -1741,7 +1739,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               )}
             </div>
           </div>
-        </details>
+          <footer><button className="button button-primary" type="button" onClick={() => setShowSettings(false)}><Check size={17} /> Done</button></footer>
+          </section></div>, document.body)}
         <section className="profile-card" data-tour="player-checkin">
           <h3>
             <UserCheck size={19} /> Player check-in
@@ -1835,12 +1834,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </section>
         </div>
       <ContextualTour open={showPageTour} onClose={() => setShowPageTour(false)} storageKey="pickleflow-tour-game-day" steps={[
+        { selector: '[data-tour="game-settings"]', title: "Adjust Game Settings", text: "Open this when you need to change the format, points to win, automatic matching, or court names and scoring links." },
         { selector: '[data-tour="court-overview"]', title: "See every court", text: "Court cards show which games are playing, their live scores, and which team is serving." },
         { selector: '[data-tour="player-checkin"]', title: "Check players in", text: "When someone arrives, tap Check In. Tap Join Queue when that player is ready for a match." },
         { selector: '[data-tour="waiting-queue"]', title: "Watch the waiting queue", text: "Players wait here in order. PickleFlow uses this list when building the next match." },
-        { selector: '[data-tour="auto-assign"]', title: "Create matches automatically", text: "Turn this on to let PickleFlow pair the next available players while you focus on the courts." },
-        { selector: '[data-tour="add-court"]', title: "Add your courts", text: "Enter a friendly name such as Court 1 or Center Court. You can rename it later." },
-        { selector: '[data-tour="scoring-link"]', title: "Give a court its scoring phone", text: "Tap the link icon beside a court and let the scorer scan its QR code." },
         { selector: '[data-tour="match-board"]', title: "Open the venue display", text: "Use Match Board on a TV or large monitor so players can follow scores, queues, and upcoming games." },
       ]} />
       <div className="game-day-grid game-day-results">

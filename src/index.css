@@ -971,6 +971,19 @@ select:focus {
 .onboarding-dialog > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px 20px; border-top: 1px solid #e5edef; background: #f8fbfc; }
 .onboarding-dialog > footer > div { display: flex; gap: 8px; }
 .onboarding-skip { border: 0; color: var(--muted); background: transparent; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 800; }
+.event-game-settings { display: grid; gap: 14px; margin: 4px 0 18px; padding: 20px; border: 1px solid #cfe0e4; border-radius: 16px; background: #f7fbfc; }
+.event-game-settings legend { display: flex; align-items: center; gap: 7px; padding: 0 7px; color: var(--navy); font-weight: 900; }
+.event-game-settings > p { margin: -3px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.5; }
+.event-auto-assign { display: flex !important; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 12px; background: white; }
+.event-auto-assign input { width: 18px; min-height: 18px; margin-top: 2px; }
+.event-auto-assign span { display: grid; gap: 3px; }
+.event-auto-assign small { color: var(--muted); font-weight: 500; line-height: 1.4; }
+.game-settings-dialog { width: min(680px, calc(100% - 28px)); max-height: calc(100vh - 40px); overflow-y: auto; border-radius: 22px; background: white; box-shadow: 0 28px 80px rgba(7,38,47,.28); }
+.game-settings-dialog > header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 20px 22px 15px; border-bottom: 1px solid #e2ebee; background: rgba(255,255,255,.96); backdrop-filter: blur(10px); }
+.game-settings-dialog > header h2 { display: flex; align-items: center; gap: 8px; margin: 6px 0 0; color: var(--navy); }
+.game-settings-dialog > header button { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; color: var(--muted); background: #eef3f5; cursor: pointer; }
+.game-settings-dialog .settings-content { padding: 20px 22px; }
+.game-settings-dialog > footer { position: sticky; bottom: 0; display: flex; justify-content: flex-end; padding: 14px 22px 18px; border-top: 1px solid #e2ebee; background: rgba(255,255,255,.96); }
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.3fr 0.7fr;
@@ -1501,7 +1514,6 @@ select:focus {
   grid-template-areas:
     "checkin matches"
     "queue matches"
-    "standings settings"
     "standings recent";
   align-items: start;
 }
@@ -1510,7 +1522,6 @@ select:focus {
 .game-day-workspace > .game-day-results { display: contents; }
 .game-day-main > section:first-child { grid-area: queue; }
 .game-day-main > section:last-child { grid-area: matches; }
-.game-day-management > details { grid-area: settings; }
 .game-day-management > section { grid-area: checkin; }
 .game-day-results > section:first-child { grid-area: standings; }
 .game-day-results > section:last-child { grid-area: recent; }
@@ -1518,7 +1529,7 @@ select:focus {
 @media (max-width: 900px) {
   .game-day-workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "checkin" "queue" "matches" "settings" "recent" "standings";
+    grid-template-areas: "checkin" "queue" "matches" "recent" "standings";
   }
 }
 
@@ -2556,6 +2567,9 @@ select:focus-visible {
   .onboarding-dialog > footer > div { display: grid; grid-template-columns: 1fr 1fr; }
   .onboarding-dialog > footer > div .button:only-child { grid-column: 1 / -1; }
   .onboarding-skip { padding: 8px; }
+  .event-game-settings { padding: 16px 13px; }
+  .game-settings-dialog { width: 100%; max-height: 92vh; border-radius: 23px 23px 0 0; }
+  .game-settings-dialog > header, .game-settings-dialog .settings-content, .game-settings-dialog > footer { padding-left: 16px; padding-right: 16px; }
   .context-tour-card { position: fixed; right: 10px !important; bottom: 10px !important; left: 10px !important; top: auto !important; width: auto !important; }
   .context-tour-card > footer { align-items: stretch; flex-direction: column-reverse; }
   .context-tour-card > footer > div { display: grid; grid-template-columns: 1fr 1fr; }

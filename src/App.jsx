@@ -18,6 +18,7 @@ import {
   Phone,
   Plus,
   Search,
+  Settings2,
   ShieldCheck,
   MessageSquarePlus,
   Sparkles,
@@ -58,6 +59,9 @@ const emptyEvent = {
   location_lat: null,
   location_lng: null,
   status: "open",
+  game_format: "open_play",
+  points_to_win: 11,
+  auto_assign_next_players: true,
 };
 const emptyPlayer = {
   full_name: "",
@@ -1180,6 +1184,9 @@ function EventForm({
       location_lat: form.location_lat === null || form.location_lat === "" ? null : Number(form.location_lat),
       location_lng: form.location_lng === null || form.location_lng === "" ? null : Number(form.location_lng),
       status: form.status,
+      game_format: form.game_format,
+      points_to_win: Number(form.points_to_win),
+      auto_assign_next_players: Boolean(form.auto_assign_next_players),
     };
     if (!editing)
       Object.assign(payload, {
@@ -1265,6 +1272,29 @@ function EventForm({
             />
           </label>
         </div>
+        <fieldset className="event-game-settings">
+          <legend><Settings2 size={18} /> Game settings</legend>
+          <p>Choose how matches will run. These settings can still be changed during Game Day.</p>
+          <div className="form-row">
+            <label>
+              Game format
+              <select required name="game_format" value={form.game_format || "open_play"} onChange={update}>
+                <option value="open_play">Open Play</option>
+                <option value="singles">Singles</option>
+                <option value="doubles">Doubles</option>
+                <option value="mixed_doubles">Mixed doubles</option>
+              </select>
+            </label>
+            <label>
+              Points to win
+              <input required type="number" min="1" max="99" name="points_to_win" value={form.points_to_win || 11} onChange={update} />
+            </label>
+          </div>
+          <label className="event-auto-assign">
+            <input type="checkbox" checked={Boolean(form.auto_assign_next_players)} onChange={(event) => setForm({ ...form, auto_assign_next_players: event.target.checked })} />
+            <span><strong>Automatically prepare the next match</strong><small>PickleFlow selects the next available players from the waiting queue.</small></span>
+          </label>
+        </fieldset>
         <LocationPicker
           latitude={form.location_lat}
           longitude={form.location_lng}
