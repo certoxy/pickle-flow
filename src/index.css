@@ -3041,8 +3041,13 @@ select:focus-visible {
 .scorer-header-actions > a { display: inline-flex; align-items: center; gap: 5px; padding: 8px 11px; border-radius: 10px; color: #3d3100; background: var(--yellow); text-decoration: none; font-size: .75rem; font-weight: 800; }
 .scorer-card, .scorer-empty { background: #fff; border-radius: 22px; padding: 22px; box-shadow: 0 12px 36px rgba(16, 51, 60, .1); text-align: center; }
 .scorer-card h1 { margin: 5px 0 20px; font-size: 1.25rem; color: var(--navy); }
-.serve-guide { display: flex; align-items: center; justify-content: center; gap: 8px; margin: -8px 0 15px; padding: 9px 12px; border-radius: 12px; color: #315d12; background: #eff9dc; font-size: .78rem; }
-.serve-guide span { color: inherit; }
+.serve-guide { width: 100%; display: grid; grid-template-columns: minmax(54px, auto) auto; align-items: center; justify-content: center; gap: 11px; margin: -8px 0 15px; padding: 9px 12px; border: 1px solid #cbe4a7; border-radius: 12px; color: #315d12; background: #eff9dc; cursor: pointer; font: inherit; font-size: .78rem; }
+.serve-guide > span:last-child { display: grid; text-align: left; }
+.serve-guide strong { font-size: .8rem; }
+.serve-guide small { margin-top: 2px; color: #60803d; font-size: .68rem; }
+.serve-arrows { color: #4f8e18; font: 1000 1.65rem/1 ui-monospace, monospace; letter-spacing: -.16em; }
+.serve-guide.team-1 .serve-arrows { text-align: right; }
+.serve-guide.team-2 .serve-arrows { text-align: left; }
 .scorer-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .scorer-teams article { position: relative; border: 1px solid #dfe9e8; border-radius: 18px; padding: 50px 12px 18px; display: grid; gap: 10px; transition: opacity .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease; }
 .scorer-teams article.serving { border-color: #9acb54; background: linear-gradient(180deg, #f5fce9, #fff 42%); box-shadow: 0 0 0 2px rgba(126,181,58,.13); }

@@ -27,6 +27,7 @@ export default function CourtScoring({ token }) {
   const [offlineAnswer, setOfflineAnswer] = useState("");
   const [offlineError, setOfflineError] = useState("");
   const [servingTeam, setServingTeam] = useState(1);
+  const [serveNumber, setServeNumber] = useState(1);
   const syncTimer = useRef(null);
   const flushing = useRef(false);
   const directSync = useRef(null);
@@ -36,8 +37,10 @@ export default function CourtScoring({ token }) {
 
   useEffect(() => {
     if (!activeGameId) return;
-    const saved = Number(window.localStorage.getItem(`pickleflow-serving-${activeGameId}`));
-    setServingTeam(saved === 2 ? 2 : 1);
+    const saved = window.localStorage.getItem(`pickleflow-serving-${activeGameId}`);
+    const [team, serve] = String(saved || "1:1").split(":").map(Number);
+    setServingTeam(team === 2 ? 2 : 1);
+    setServeNumber(serve === 2 ? 2 : 1);
   }, [activeGameId]);
 
   const applyPendingScore = useCallback((data) => {
@@ -228,7 +231,17 @@ export default function CourtScoring({ token }) {
   function changeServingTeam(team) {
     if (!activeGameId) return;
     setServingTeam(team);
-    window.localStorage.setItem(`pickleflow-serving-${activeGameId}`, String(team));
+    setServeNumber(1);
+    window.localStorage.setItem(`pickleflow-serving-${activeGameId}`, `${team}:1`);
+  }
+
+  function advanceServe() {
+    if (!activeGameId) return;
+    const nextTeam = serveNumber === 1 ? servingTeam : servingTeam === 1 ? 2 : 1;
+    const nextServe = serveNumber === 1 ? 2 : 1;
+    setServingTeam(nextTeam);
+    setServeNumber(nextServe);
+    window.localStorage.setItem(`pickleflow-serving-${activeGameId}`, `${nextTeam}:${nextServe}`);
   }
 
   if (loading) return <main className="court-scoring-page"><p>Loading court…</p></main>;
@@ -263,7 +276,10 @@ export default function CourtScoring({ token }) {
         <section className="scorer-card">
           <span className="eyebrow">Live · Game {view.game.game_number}</span>
           <h1>First to {view.game.points_to_win}</h1>
-          <div className="serve-guide"><CircleDot size={17} /><span><strong>Team {servingTeam} is serving</strong> Tap “Set serve” when service changes.</span></div>
+          <button type="button" className={`serve-guide team-${servingTeam}`} onClick={advanceServe} aria-label={`Team ${servingTeam}, serve ${serveNumber}. Advance serve.`}>
+            <span className="serve-arrows">{servingTeam === 1 ? (serveNumber === 1 ? "<" : "<<") : serveNumber === 1 ? ">" : ">>"}</span>
+            <span><strong>Team {servingTeam} · Serve {serveNumber}</strong><small>Tap after a side-out</small></span>
+          </button>
           <div className="scorer-teams">
             {[1, 2].map((team) => {
               const score = team === 1 ? view.game.team_one_score : view.game.team_two_score;
@@ -271,7 +287,7 @@ export default function CourtScoring({ token }) {
               const isServing = servingTeam === team;
               return <article key={team} className={isServing ? "serving" : "receiving"}>
                 <button type="button" className="serve-toggle" onClick={() => changeServingTeam(team)} aria-pressed={isServing}>
-                  {isServing ? <><CircleDot size={15} /> Serving</> : <>Set serve</>}
+                  {isServing ? <><CircleDot size={15} /> Serving · {serveNumber}</> : <>Start serve</>}
                 </button>
                 <span>Team {team}</span>
                 <h2>{names.join(" & ")}</h2>
