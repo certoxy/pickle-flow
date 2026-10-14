@@ -79,6 +79,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [offlineAnswer, setOfflineAnswer] = useState("");
   const [showOfflineScanner, setShowOfflineScanner] = useState(false);
   const [showPageTour, setShowPageTour] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(true);
   const scoreSaveChains = useRef({});
   const directSyncs = useRef(new Map());
   const offlineSyncs = useRef(new Map());
@@ -1643,7 +1644,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         <div className="game-day-grid game-day-management">
           <details
           className="profile-card game-settings"
-          open={courts.length === 0 ? true : undefined}
+          open={settingsOpen}
+          onToggle={(event) => setSettingsOpen(event.currentTarget.open)}
         >
           <summary>Game settings & courts</summary>
           <div className="settings-content">
@@ -1832,7 +1834,6 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </div>
           </section>
         </div>
-      </div>
       <ContextualTour open={showPageTour} onClose={() => setShowPageTour(false)} storageKey="pickleflow-tour-game-day" steps={[
         { selector: '[data-tour="court-overview"]', title: "See every court", text: "Court cards show which games are playing, their live scores, and which team is serving." },
         { selector: '[data-tour="player-checkin"]', title: "Check players in", text: "When someone arrives, tap Check In. Tap Join Queue when that player is ready for a match." },
@@ -1842,7 +1843,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         { selector: '[data-tour="scoring-link"]', title: "Give a court its scoring phone", text: "Tap the link icon beside a court and let the scorer scan its QR code." },
         { selector: '[data-tour="match-board"]', title: "Open the venue display", text: "Use Match Board on a TV or large monitor so players can follow scores, queues, and upcoming games." },
       ]} />
-      <div className="game-day-grid">
+      <div className="game-day-grid game-day-results">
         <section className="profile-card">
           <h3>
             <Trophy size={19} /> Event standings
@@ -1900,6 +1901,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             )}
           </div>
         </section>
+      </div>
       </div>
     </section>
   );
