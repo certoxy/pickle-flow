@@ -1510,31 +1510,31 @@ select:focus {
 
 /* Game Day follows the organizer's natural workflow: arrive, queue, play. */
 .game-day-workspace {
-  grid-template-columns: minmax(310px, .82fr) minmax(460px, 1.18fr);
+  grid-template-columns: minmax(360px, .82fr) minmax(260px, .59fr) minmax(260px, .59fr);
   grid-template-areas:
-    "checkin matches"
-    "queue matches"
-    "queue results";
+    "checkin matches matches"
+    "standings queue recent";
   align-items: start;
 }
 .game-day-workspace > .game-day-main,
-.game-day-workspace > .game-day-management { display: contents; }
+.game-day-workspace > .game-day-management,
+.game-day-workspace > .game-day-results { display: contents; }
 .game-day-main > section:first-child { grid-area: queue; }
 .game-day-main > section:last-child { grid-area: matches; }
 .game-day-management > section { grid-area: checkin; }
-.game-day-workspace > .game-day-results { grid-area: results; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-self: start; }
+.game-day-results > section:first-child { grid-area: standings; }
+.game-day-results > section:last-child { grid-area: recent; }
 
 @media (max-width: 900px) {
   .game-day-workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "checkin" "queue" "matches" "results";
+    grid-template-areas: "checkin" "queue" "matches" "standings" "recent";
   }
-  .game-day-workspace > .game-day-results { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (min-width: 1100px) {
   .game-day-workspace {
-    grid-template-columns: minmax(330px, .8fr) minmax(520px, 1.2fr);
+    grid-template-columns: minmax(380px, .82fr) minmax(280px, .59fr) minmax(280px, .59fr);
   }
 }
 .direct-score-status {
@@ -2231,7 +2231,7 @@ select:focus {
     font-size: 1.35rem;
   }
   .game-day-workspace {
-    grid-template-columns: minmax(330px, 0.8fr) minmax(520px, 1.2fr);
+    grid-template-columns: minmax(380px, 0.82fr) minmax(280px, 0.59fr) minmax(280px, 0.59fr);
     gap: 12px;
     align-items: start;
   }
