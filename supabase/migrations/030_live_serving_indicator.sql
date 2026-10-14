@@ -1,6 +1,7 @@
 alter table public.games
   add column if not exists serving_team integer not null default 1,
-  add column if not exists serve_number integer not null default 1;
+  add column if not exists serve_number integer not null default 1,
+  add column if not exists service_tracking_active boolean not null default false;
 
 alter table public.games drop constraint if exists games_serving_team_check;
 alter table public.games add constraint games_serving_team_check check (serving_team in (1, 2));
@@ -18,7 +19,8 @@ begin
   select court_id into target_court_id from public.court_scoring_access
   where access_token = p_token and revoked_at is null and expires_at > now();
   if target_court_id is null then raise exception 'This scoring link is invalid or has expired'; end if;
-  update public.games set serving_team = p_serving_team, serve_number = p_serve_number
+  update public.games set serving_team = p_serving_team, serve_number = p_serve_number,
+    service_tracking_active = true
   where id = p_game_id and court_id = target_court_id and status = 'playing';
   if not found then raise exception 'This game is no longer active on this court'; end if;
 end;
@@ -42,6 +44,7 @@ begin
       'team_one_score', coalesce(g.team_one_score, 0),
       'team_two_score', coalesce(g.team_two_score, 0),
       'serving_team', g.serving_team, 'serve_number', g.serve_number,
+      'service_tracking_active', g.service_tracking_active,
       'team_one', coalesce((select jsonb_agg(pr.full_name order by gp.id)
         from public.game_players gp join public.player_registrations pr on pr.id = gp.player_registration_id
         where gp.game_id = g.id and gp.team_number = 1), '[]'::jsonb),
@@ -79,6 +82,7 @@ begin
         'team_one_score', coalesce(g.team_one_score, 0),
         'team_two_score', coalesce(g.team_two_score, 0),
         'serving_team', g.serving_team, 'serve_number', g.serve_number,
+        'service_tracking_active', g.service_tracking_active,
         'team_one', coalesce((select jsonb_agg(pr.full_name order by gp.id)
           from public.game_players gp join public.player_registrations pr on pr.id = gp.player_registration_id
           where gp.game_id = g.id and gp.team_number = 1), '[]'::jsonb),

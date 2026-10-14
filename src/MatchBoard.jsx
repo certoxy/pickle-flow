@@ -106,9 +106,9 @@ export default function MatchBoard({ token }) {
         <header><h2>{court.name}</h2><span>{court.game ? `GAME ${court.game.game_number}` : "AVAILABLE"}</span></header>
         {court.game ? <>
           <div className="tv-score">
-            <div className={Number(court.game.serving_team || 1) === 1 ? "serving" : ""}><strong>{court.game.team_one_score}</strong><span>{names(court.game.team_one)}</span>{Number(court.game.serving_team || 1) === 1 && <em><CircleDot /> SERVING · {court.game.serve_number || 1}</em>}</div>
+            <div className={court.game.service_tracking_active && Number(court.game.serving_team || 1) === 1 ? "serving" : ""}><strong>{court.game.team_one_score}</strong><span>{names(court.game.team_one)}</span>{court.game.service_tracking_active && Number(court.game.serving_team || 1) === 1 && <em><CircleDot /> SERVING · {court.game.serve_number || 1}</em>}</div>
             <b>–</b>
-            <div className={Number(court.game.serving_team || 1) === 2 ? "serving" : ""}><strong>{court.game.team_two_score}</strong><span>{names(court.game.team_two)}</span>{Number(court.game.serving_team || 1) === 2 && <em><CircleDot /> SERVING · {court.game.serve_number || 1}</em>}</div>
+            <div className={court.game.service_tracking_active && Number(court.game.serving_team || 1) === 2 ? "serving" : ""}><strong>{court.game.team_two_score}</strong><span>{names(court.game.team_two)}</span>{court.game.service_tracking_active && Number(court.game.serving_team || 1) === 2 && <em><CircleDot /> SERVING · {court.game.serve_number || 1}</em>}</div>
           </div>
         </> : <div className="tv-no-game"><Clock3 /><span>Waiting for players</span></div>}
         <footer><span>NEXT</span>{court.next_game ? <strong>Game {court.next_game.game_number}: {names(court.next_game.team_one)} vs {names(court.next_game.team_two)}</strong> : <strong>No match queued</strong>}</footer>

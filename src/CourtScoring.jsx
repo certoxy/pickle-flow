@@ -34,6 +34,7 @@ export default function CourtScoring({ token }) {
   const flushing = useRef(false);
   const directSync = useRef(null);
   const offlineSync = useRef(null);
+  const initializedServiceGame = useRef(null);
   const activeGameId = view?.game?.id;
   const hasActiveGame = Boolean(activeGameId);
 
@@ -87,6 +88,10 @@ export default function CourtScoring({ token }) {
     const [team, serve] = String(persisted).split(":").map(Number);
     setServingTeam(team === 2 ? 2 : 1);
     setServeNumber(serve === 2 ? 2 : 1);
+    if (navigator.onLine && initializedServiceGame.current !== activeGameId) {
+      initializedServiceGame.current = activeGameId;
+      saveServingState(team === 2 ? 2 : 1, serve === 2 ? 2 : 1);
+    }
   }, [activeGameId, view?.game?.serving_team, view?.game?.serve_number]);
 
   async function saveServingState(team, serve) {
