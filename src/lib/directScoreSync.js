@@ -3,7 +3,9 @@ import { supabase } from "./supabase";
 const RTC_CONFIG = {
   iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
 };
-const OFFLINE_RTC_CONFIG = { iceServers: [] };
+// Keep local/host ICE candidates for same-network pairing, while also allowing
+// STUN candidates when the devices can briefly reach the internet.
+const OFFLINE_RTC_CONFIG = RTC_CONFIG;
 
 const channelName = (token) => `direct-score-${token}`;
 
@@ -310,6 +312,12 @@ export function createOfflineOrganizerSync({ onScore, onStatus, getView }) {
   let pc = null;
   let dataChannel = null;
   let closed = false;
+  let connectionTimer = null;
+
+  const clearConnectionTimer = () => {
+    if (connectionTimer) window.clearTimeout(connectionTimer);
+    connectionTimer = null;
+  };
 
   const sendView = (view = getView?.()) => {
     if (view && dataChannel?.readyState === "open")
@@ -328,8 +336,14 @@ export function createOfflineOrganizerSync({ onScore, onStatus, getView }) {
         sendView();
       };
       pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "connected") onStatus?.("connected");
-        if (["failed", "disconnected"].includes(pc.connectionState) && !closed) onStatus?.("error");
+        if (pc.connectionState === "connected") {
+          clearConnectionTimer();
+          onStatus?.("connected");
+        }
+        if (["failed", "disconnected"].includes(pc.connectionState) && !closed) {
+          clearConnectionTimer();
+          onStatus?.("blocked");
+        }
       };
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -342,10 +356,15 @@ export function createOfflineOrganizerSync({ onScore, onStatus, getView }) {
       const description = await decodeHandshake(code);
       await pc.setRemoteDescription(description);
       onStatus?.("connecting");
+      clearConnectionTimer();
+      connectionTimer = window.setTimeout(() => {
+        if (!closed && pc?.connectionState !== "connected") onStatus?.("blocked");
+      }, 12000);
     },
     sendView,
     close() {
       closed = true;
+      clearConnectionTimer();
       pc?.close();
     },
   };

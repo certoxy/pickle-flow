@@ -1207,6 +1207,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   <button className="button button-secondary" type="button" disabled={!offlineAnswer.trim()} onClick={() => acceptOfflineAnswer()}>Use response code</button>
                 </> : <button className="button button-secondary" type="button" onClick={beginOfflinePairing}>Try again</button>}
               {offlinePairing?.court.id === scoringLink.court.id && offlinePairing.status === "connected" && <p className="offline-connected"><Check size={16} /> Fully offline connection established.</p>}
+              {offlinePairing?.court.id === scoringLink.court.id && offlinePairing.status === "blocked" && <p className="offline-blocked">The response code was accepted, but the devices could not make a direct connection. Put both devices on the same Wi-Fi or phone hotspot, turn off VPN and iCloud Private Relay, and make sure the Wi-Fi does not isolate connected devices. Then pair again.</p>}
             </div>
             <div className="scorer-qr-wrap">
               <QRCodeCanvas

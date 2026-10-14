@@ -1485,12 +1485,15 @@ select:focus {
 .offline-answer-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .offline-pairing-box label { display: grid; gap: 5px; color: var(--muted); font-size: .75rem; }
 .offline-connected { display: flex; align-items: center; gap: 7px; color: #27612c !important; font-weight: 900; }
+.offline-blocked { padding: 10px 12px; border: 1px solid #efc478; border-radius: 10px; color: #704d0a !important; background: #fff7e5; line-height: 1.45; }
 .offline-scanner { display: grid; gap: 10px; overflow: hidden; padding: 10px; border-radius: 14px; color: white; background: #071f29; }
 .offline-scanner header { display: flex; align-items: center; justify-content: space-between; }
 .offline-scanner header span { display: flex; align-items: center; gap: 7px; font-weight: 900; }
 .offline-scanner header button { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; color: white; background: rgba(255,255,255,.14); cursor: pointer; }
 .offline-scanner video { width: 100%; min-height: 220px; border-radius: 10px; object-fit: cover; background: black; }
 .offline-scanner p { margin: 0; color: #ffd0ca; font-size: .8rem; }
+.offline-scanner-error { display: grid; gap: 8px; }
+.offline-scanner-error button { justify-self: start; padding: 7px 11px; border: 1px solid rgba(255,255,255,.32); border-radius: 8px; color: white; background: rgba(255,255,255,.12); font: inherit; font-weight: 800; cursor: pointer; }
 .offline-response-card { width: min(560px, calc(100% - 32px)); display: grid; justify-items: center; gap: 12px; margin: 14px auto; padding: 22px; border: 1px solid #cbdbe2; border-radius: 20px; background: white; box-shadow: 0 14px 35px rgba(8,42,52,.12); text-align: center; }
 .offline-response-card h2, .offline-response-card p { margin: 0; }
 .offline-response-card canvas { max-width: 100%; height: auto !important; }
