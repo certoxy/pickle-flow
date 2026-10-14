@@ -2263,9 +2263,12 @@ select:focus {
   .game-day-page .subheading {
     margin-top: 17px !important;
   }
-  .game-day-workspace .checkin-list,
-  .game-day-workspace .queue-list {
+  .game-day-workspace .checkin-list {
     max-height: 510px;
+  }
+  .game-day-workspace .queue-list {
+    max-height: none;
+    overflow: visible;
   }
   .game-day-workspace .match-list {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
