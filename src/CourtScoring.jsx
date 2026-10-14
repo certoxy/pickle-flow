@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CircleDot, Clock3, Heart, Lock, Minus, Plus, Radio, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CircleDot, Clock3, Heart, HelpCircle, Lock, Minus, Plus, Radio, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "./lib/supabase";
 import {
@@ -10,6 +10,7 @@ import {
   savePendingScore,
 } from "./lib/offlineScores";
 import { createOfflineScorerSync, createScorerDirectSync } from "./lib/directScoreSync";
+import ContextualTour from "./ContextualTour";
 
 export default function CourtScoring({ token }) {
   const cached = getCachedCourtView(token);
@@ -30,6 +31,7 @@ export default function CourtScoring({ token }) {
   const [acceptingOfflineOffer, setAcceptingOfflineOffer] = useState(false);
   const [servingTeam, setServingTeam] = useState(1);
   const [serveNumber, setServeNumber] = useState(1);
+  const [showPageTour, setShowPageTour] = useState(false);
   const syncTimer = useRef(null);
   const flushing = useRef(false);
   const directSync = useRef(null);
@@ -37,6 +39,9 @@ export default function CourtScoring({ token }) {
   const initializedServiceGame = useRef(null);
   const activeGameId = view?.game?.id;
   const hasActiveGame = Boolean(activeGameId);
+  useEffect(() => {
+    if (!window.localStorage.getItem("pickleflow-tour-scoring")) setShowPageTour(true);
+  }, []);
 
   function acknowledgeDirectScore(ack) {
     const pending = pendingScoreForCourt(token, ack.gameId);
@@ -304,11 +309,12 @@ export default function CourtScoring({ token }) {
         <img src="/brand/pickleflow-logo.png" alt="PickleFlow" />
         <div className="scorer-header-actions">
           <div><span>{view.event_name}</span><strong>{view.court_name}</strong></div>
+          <button className="scorer-help-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={16} /> Guide</button>
           <a href="/suggest" target="_blank" rel="noreferrer">Suggest</a>
           <a href="/donate" target="_blank" rel="noreferrer"><Heart size={15} /> Donate</a>
         </div>
       </header>
-      <div className={`score-sync-status ${!isOnline ? "offline" : syncState}`} role="status">
+      <div className={`score-sync-status ${!isOnline ? "offline" : syncState}`} data-tour="score-sync" role="status">
         {!isOnline ? <WifiOff size={17} /> : <Wifi size={17} />}
         <span>{!isOnline
           ? `Offline · ${pendingCount ? "score saved on this device" : "ready to score"}`
@@ -332,7 +338,7 @@ export default function CourtScoring({ token }) {
         <section className="scorer-card">
           <span className="eyebrow">Live · Game {view.game.game_number}</span>
           <h1>First to {view.game.points_to_win}</h1>
-          <button type="button" className={`serve-guide team-${servingTeam}`} onClick={advanceServe} aria-label={`Team ${servingTeam}, serve ${serveNumber}. Advance serve.`}>
+          <button type="button" data-tour="serve-control" className={`serve-guide team-${servingTeam}`} onClick={advanceServe} aria-label={`Team ${servingTeam}, serve ${serveNumber}. Advance serve.`}>
             <span className="serve-arrows" aria-hidden="true">
               {servingTeam === 1
                 ? serveNumber === 1 ? <ChevronLeft /> : <ChevronsLeft />
@@ -340,7 +346,7 @@ export default function CourtScoring({ token }) {
             </span>
             <span><strong>Team {servingTeam} · Serve {serveNumber}</strong><small>Tap after a side-out</small></span>
           </button>
-          <div className="scorer-teams">
+          <div className="scorer-teams" data-tour="score-controls">
             {[1, 2].map((team) => {
               const score = team === 1 ? view.game.team_one_score : view.game.team_two_score;
               const names = team === 1 ? view.game.team_one : view.game.team_two;
@@ -364,6 +370,11 @@ export default function CourtScoring({ token }) {
       ) : (
         <section className="scorer-empty"><Clock3 /><h1>Waiting for a match</h1><p>This screen will update when the organizer starts a game on {view.court_name}.</p><button className="button button-secondary" onClick={() => load()}><RefreshCw size={17} /> Refresh</button></section>
       )}
+      <ContextualTour open={showPageTour} onClose={() => setShowPageTour(false)} storageKey="pickleflow-tour-scoring" steps={[
+        { selector: '[data-tour="score-sync"]', title: "Check the connection", text: "Green and Online means score changes are reaching the organizer and Match Board. Offline changes stay safely on this phone until internet returns." },
+        { selector: '[data-tour="serve-control"]', title: "Change the serve", text: "This shows the serving team and Serve 1 or Serve 2. Tap it after a side-out to move to the next serve." },
+        { selector: '[data-tour="score-controls"]', title: "Update the score", text: "Only the serving team can add a point. Use minus if you need to correct the last score." },
+      ]} />
       {offlineAnswer && directState !== "connected" && <section className="offline-response-card">
         <span className="eyebrow">Offline pairing · Step 2</span>
         <h2>Scan this response on the organizer device</h2>

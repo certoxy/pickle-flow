@@ -9,6 +9,7 @@ import {
   Download,
   Edit3,
   ExternalLink,
+  HelpCircle,
   Link,
   MonitorUp,
   Play,
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import QrScanner from "./QrScanner";
+import ContextualTour from "./ContextualTour";
 import { supabase } from "./lib/supabase";
 import {
   acknowledgePendingScore,
@@ -76,6 +78,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [offlinePairing, setOfflinePairing] = useState(null);
   const [offlineAnswer, setOfflineAnswer] = useState("");
   const [showOfflineScanner, setShowOfflineScanner] = useState(false);
+  const [showPageTour, setShowPageTour] = useState(false);
   const scoreSaveChains = useRef({});
   const directSyncs = useRef(new Map());
   const offlineSyncs = useRef(new Map());
@@ -83,6 +86,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const courtDataRef = useRef({ players: [], gamePlayers: [], scores: {} });
   const courtViewInitialized = useRef(false);
   const teamSize = event.game_format === "singles" ? 1 : 2;
+  useEffect(() => {
+    if (!window.localStorage.getItem("pickleflow-tour-game-day")) setShowPageTour(true);
+  }, []);
   const playersNeeded = teamSize * 2;
 
   async function load() {
@@ -1362,7 +1368,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </span>
           <h2>{event.name}</h2>
         </div>
-        <div className="game-day-title-actions"><button className="button button-secondary" onClick={openDisplayLink}><MonitorUp size={16} /> Match Board</button><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
+        <div className="game-day-title-actions"><button className="page-guide-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={17} /> Guide</button><button className="button button-secondary" data-tour="match-board" onClick={openDisplayLink}><MonitorUp size={16} /> Match Board</button><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
       </div>
       <div className={`score-sync-status ${!isOnline ? "offline" : syncState}`} role="status">
         {!isOnline ? <WifiOff size={17} /> : <Wifi size={17} />}
@@ -1395,7 +1401,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           <span>Completed</span>
         </div>
       </div>
-      {courts.length > 0 && <section className="court-overview" aria-label="Court overview">
+      {courts.length > 0 && <section className="court-overview" data-tour="court-overview" aria-label="Court overview">
         <div className="court-overview-heading"><strong>Court overview</strong><button type="button" onClick={() => setMonitoredCourt("")} className={!monitoredCourt ? "selected" : ""}>View all matches</button></div>
         <div className="court-overview-list">
           {courts.filter((court) => court.status !== "disabled").map((court) => {
@@ -1413,7 +1419,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       </section>}
       <div className="game-day-workspace">
         <div className="game-day-grid game-day-main">
-        <section className="profile-card">
+        <section className="profile-card" data-tour="waiting-queue">
           <h3>
             <Clock3 size={19} /> Waiting queue
           </h3>
@@ -1669,7 +1675,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 />
               </label>
             </div>
-            <label className="auto-assign-toggle">
+            <label className="auto-assign-toggle" data-tour="auto-assign">
               <input
                 type="checkbox"
                 checked={Boolean(event.auto_assign_next_players)}
@@ -1698,7 +1704,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               </div>
             )}
             <h3 className="subheading">Courts</h3>
-            <form className="court-form" onSubmit={addCourt}>
+            <form className="court-form" data-tour="add-court" onSubmit={addCourt}>
               <input
                 required
                 placeholder="Court name or number"
@@ -1721,7 +1727,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                       {court.name}<span>{court.status.replace("_", " ")}</span>
                     </button>
                     <button className="court-icon-button" onClick={() => beginCourtRename(court)} aria-label={`Edit ${court.name} name`} title="Edit court name"><Edit3 size={17} /></button>
-                    <button className="court-link-button" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
+                    <button className="court-link-button" data-tour="scoring-link" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
                     {directConnections[court.id] && <span className={`direct-court-status ${directConnections[court.id]}`} title="Direct device sync"><Radio size={13} />{directConnections[court.id] === "connected" ? "Direct" : "Pairing"}</span>}
                   </>}
                 </div>
@@ -1734,7 +1740,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             </div>
           </div>
         </details>
-        <section className="profile-card">
+        <section className="profile-card" data-tour="player-checkin">
           <h3>
             <UserCheck size={19} /> Player check-in
           </h3>
@@ -1827,6 +1833,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </section>
         </div>
       </div>
+      <ContextualTour open={showPageTour} onClose={() => setShowPageTour(false)} storageKey="pickleflow-tour-game-day" steps={[
+        { selector: '[data-tour="court-overview"]', title: "See every court", text: "Court cards show which games are playing, their live scores, and which team is serving." },
+        { selector: '[data-tour="player-checkin"]', title: "Check players in", text: "When someone arrives, tap Check In. Tap Join Queue when that player is ready for a match." },
+        { selector: '[data-tour="waiting-queue"]', title: "Watch the waiting queue", text: "Players wait here in order. PickleFlow uses this list when building the next match." },
+        { selector: '[data-tour="auto-assign"]', title: "Create matches automatically", text: "Turn this on to let PickleFlow pair the next available players while you focus on the courts." },
+        { selector: '[data-tour="add-court"]', title: "Add your courts", text: "Enter a friendly name such as Court 1 or Center Court. You can rename it later." },
+        { selector: '[data-tour="scoring-link"]', title: "Give a court its scoring phone", text: "Tap the link icon beside a court and let the scorer scan its QR code." },
+        { selector: '[data-tour="match-board"]', title: "Open the venue display", text: "Use Match Board on a TV or large monitor so players can follow scores, queues, and upcoming games." },
+      ]} />
       <div className="game-day-grid">
         <section className="profile-card">
           <h3>

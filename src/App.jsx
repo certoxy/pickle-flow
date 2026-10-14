@@ -37,6 +37,7 @@ import autoTable from "jspdf-autotable";
 import GameDay from "./GameDay";
 import CourtScoring from "./CourtScoring";
 import MatchBoard from "./MatchBoard";
+import ContextualTour from "./ContextualTour";
 
 const emptyProfile = {
   full_name: "",
@@ -1311,7 +1312,11 @@ function EventForm({
   );
 }
 
-function EventList({ events, archives, onSelect, onNew, allowance, onUpgrade }) {
+function EventList({ events, archives, onSelect, onNew, allowance, onUpgrade, allowAutoTour }) {
+  const [showPageTour, setShowPageTour] = useState(false);
+  useEffect(() => {
+    if (allowAutoTour && !window.localStorage.getItem("pickleflow-tour-events")) setShowPageTour(true);
+  }, [allowAutoTour]);
   async function copyLink(code) {
     await navigator.clipboard.writeText(
       `${window.location.origin}/?event=${code}`,
@@ -1320,7 +1325,7 @@ function EventList({ events, archives, onSelect, onNew, allowance, onUpgrade }) 
   }
   return (
     <section className="events-section">
-      <div className="active-event-meter">
+      <div className="active-event-meter" data-tour="event-limit">
         <div><span>Active events</span><strong>{allowance.active_count} of {allowance.event_limit}</strong><small>Open events dated today or later</small></div>
         <button className="button button-donate" onClick={onUpgrade}><Heart size={17} /> Add active events</button>
       </div>
@@ -1329,9 +1334,9 @@ function EventList({ events, archives, onSelect, onNew, allowance, onUpgrade }) 
           <span className="eyebrow">Your events</span>
           <h2>Event registration</h2>
         </div>
-        <button className="button button-primary" onClick={onNew}>
+        <div className="title-actions"><button className="page-guide-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={17} /> Guide</button><button className="button button-primary" data-tour="create-event" onClick={onNew}>
           <Plus size={17} /> Create event
-        </button>
+        </button></div>
       </div>
       {!events.length ? (
         <div className="empty-state">
@@ -1342,7 +1347,7 @@ function EventList({ events, archives, onSelect, onNew, allowance, onUpgrade }) 
       ) : (
         <div className="event-grid">
           {events.map((item) => (
-            <article className="event-card" key={item.id}>
+            <article className="event-card" data-tour="event-card" key={item.id}>
               <div className="event-card-top">
                 <span className={`status-badge ${item.status}`}>
                   {item.status}
@@ -1404,11 +1409,17 @@ function EventList({ events, archives, onSelect, onNew, allowance, onUpgrade }) 
           </div>
         </section>
       )}
+      <ContextualTour open={showPageTour} onClose={() => setShowPageTour(false)} storageKey="pickleflow-tour-events" steps={[
+        { selector: '[data-tour="event-limit"]', title: "Your active-event allowance", text: "This shows how many current and future open events you can have. Completed or past events do not use this allowance." },
+        { selector: '[data-tour="create-event"]', title: "Create an event", text: "Tap here first. Add the date, venue, player limit, and other event details." },
+        { selector: '[data-tour="event-card"]', title: "Open your event", text: "Each event appears as a card. Open it to manage registration, players, exports, and Game Day." },
+      ]} />
     </section>
   );
 }
 
 function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
+  const [showPageTour, setShowPageTour] = useState(false);
   const [players, setPlayers] = useState([]),
     [loading, setLoading] = useState(true),
     [search, setSearch] = useState(""),
@@ -1430,6 +1441,9 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
     [showImport, setShowImport] = useState(false),
     [importRows, setImportRows] = useState([]),
     [importing, setImporting] = useState(false);
+  useEffect(() => {
+    if (!window.localStorage.getItem("pickleflow-tour-players")) setShowPageTour(true);
+  }, []);
   const registrationOpen = event.status === "open";
   const deletionDate =
     event.retention_extended_until || addDays(event.event_date, 3);
@@ -1803,8 +1817,8 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           <span className="eyebrow">Event code {event.event_code}</span>
           <h2>{event.name}</h2>
         </div>
-        <div className="title-actions">
-          <button className="button button-primary" onClick={onGameDay}>
+        <div className="title-actions"><button className="page-guide-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={17} /> Guide</button>
+          <button className="button button-primary" data-tour="open-game-day" onClick={onGameDay}>
             Open game day
           </button>
           <button className="button button-secondary" onClick={onBack}>
@@ -1812,7 +1826,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           </button>
         </div>
       </div>
-      <div className="event-detail-bar">
+      <div className="event-detail-bar" data-tour="registration-control">
         <div>
           <p className="muted">
             {event.venue} · {formatDate(event.event_date)}
@@ -1921,7 +1935,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           <span>Waitlisted</span>
         </div>
       </div>
-      <div className="roster-toolbar">
+      <div className="roster-toolbar" data-tour="player-tools">
         <label className="search-field">
           <Search size={17} />
           <input
@@ -1941,7 +1955,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           <option value="waitlisted">Waitlisted</option>
           <option value="cancelled">Cancelled</option>
         </select>
-        <button
+        <button data-tour="add-walkin"
           className={`button button-secondary ${!registrationOpen ? "requires-reopen" : ""}`}
           aria-disabled={!registrationOpen}
           title={
@@ -1963,11 +1977,18 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
         <button className="button button-secondary" onClick={exportPdf}>
           <Download size={16} /> Export PDF
         </button>
-        <label className="button button-secondary import-file-button">
+        <label className="button button-secondary import-file-button" data-tour="import-players">
           <FileUp size={16} /> Import CSV
           <input type="file" accept=".csv,text/csv" onChange={readImportFile} />
         </label>
       </div>
+      <ContextualTour open={showPageTour} onClose={() => setShowPageTour(false)} storageKey="pickleflow-tour-players" steps={[
+        { selector: '[data-tour="registration-control"]', title: "Control registration", text: "Edit the event or close and reopen public registration from this area." },
+        { selector: '[data-tour="player-tools"]', title: "Find and manage players", text: "Search, filter, add walk-ins, import a CSV, or export your event information." },
+        { selector: '[data-tour="add-walkin"]', title: "Add a player yourself", text: "Use Add walk-in for a player who arrives without registering online." },
+        { selector: '[data-tour="import-players"]', title: "Import many players", text: "Upload the CSV template when you already have a player list." },
+        { selector: '[data-tour="open-game-day"]', title: "Start Game Day", text: "When players begin arriving, open Game Day for check-in, queues, courts, and scoring." },
+      ]} />
       {showImport && <section className="inline-panel import-panel">
         <div className="import-heading"><div><h3>Import player list</h3><p className="muted">Review the file before importing. Email and phone are optional.</p></div><button className="text-button compact" onClick={downloadImportTemplate}><Download size={15} /> Download template</button></div>
         <div className="import-preview"><table className="player-table"><thead><tr><th>Row</th><th>Player</th><th>Contact</th><th>Skill</th><th>Validation</th></tr></thead><tbody>{importRows.map((row) => <tr key={row.row}><td>{row.row}</td><td><strong>{row.full_name || "Missing name"}</strong></td><td>{row.email || row.phone || "—"}</td><td className="capitalize">{row.skill_level.replaceAll("_", " ")}</td><td><span className={`import-status ${row.error ? "invalid" : "valid"}`}>{row.error || "Ready"}</span></td></tr>)}</tbody></table></div>
@@ -2247,6 +2268,7 @@ function Dashboard({ session }) {
           onNew={() => setView("terms")}
           allowance={allowance}
           onUpgrade={() => setView("upgrade")}
+          allowAutoTour={!showWalkthrough}
         />
       )}
       {view === "upgrade" && <ActiveEventUpgrade session={session} onBack={() => setView("events")} onSubmitted={loadEvents} />}
