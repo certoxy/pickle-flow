@@ -1514,23 +1514,22 @@ select:focus {
   grid-template-areas:
     "checkin matches"
     "queue matches"
-    "standings recent";
+    "queue results";
   align-items: start;
 }
 .game-day-workspace > .game-day-main,
-.game-day-workspace > .game-day-management,
-.game-day-workspace > .game-day-results { display: contents; }
+.game-day-workspace > .game-day-management { display: contents; }
 .game-day-main > section:first-child { grid-area: queue; }
 .game-day-main > section:last-child { grid-area: matches; }
 .game-day-management > section { grid-area: checkin; }
-.game-day-results > section:first-child { grid-area: standings; }
-.game-day-results > section:last-child { grid-area: recent; }
+.game-day-workspace > .game-day-results { grid-area: results; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-self: start; }
 
 @media (max-width: 900px) {
   .game-day-workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "checkin" "queue" "matches" "recent" "standings";
+    grid-template-areas: "checkin" "queue" "matches" "results";
   }
+  .game-day-workspace > .game-day-results { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (min-width: 1100px) {
