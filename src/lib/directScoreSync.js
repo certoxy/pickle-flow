@@ -35,7 +35,15 @@ async function encodeHandshake(description) {
 }
 
 async function decodeHandshake(value) {
-  const [format, encoded] = String(value || "").split(".", 2);
+  let normalized = String(value || "").trim();
+  try {
+    if (/^https?:\/\//i.test(normalized))
+      normalized = new URL(normalized).searchParams.get("offlineOffer") || normalized;
+  } catch { /* Use the pasted value as-is. */ }
+  normalized = normalized
+    .replace(/^pickleflow-(offer|answer):/i, "")
+    .replace(/\s+/g, "");
+  const [format, encoded] = normalized.split(".", 2);
   if (!encoded) throw new Error("Invalid offline pairing code");
   let bytes = base64UrlToBytes(encoded);
   if (format === "g") {
@@ -331,7 +339,7 @@ export function createOfflineOrganizerSync({ onScore, onStatus, getView }) {
     },
     async acceptAnswer(code) {
       if (!pc) throw new Error("Create an offline pairing offer first");
-      const description = await decodeHandshake(String(code).replace(/^pickleflow-answer:/, ""));
+      const description = await decodeHandshake(code);
       await pc.setRemoteDescription(description);
       onStatus?.("connecting");
     },

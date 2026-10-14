@@ -592,7 +592,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     try {
       const offer = await sync.createOffer();
       const offerUrl = `${scoringLink.url}&offlineOffer=${encodeURIComponent(offer)}`;
-      setOfflinePairing({ court, status: "offer-ready", offerUrl });
+      setOfflinePairing({ court, status: "offer-ready", offerUrl, offerCode: `pickleflow-offer:${offer}` });
     } catch (error) {
       setOfflinePairing({ court, status: "error", offerUrl: "" });
       setMessage(`Offline pairing could not start: ${error.message}`);
@@ -1200,9 +1200,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               ) : offlinePairing.status === "creating" ? <p>Preparing secure local pairing…</p>
                 : offlinePairing.offerUrl ? <>
                   <div className="offline-offer-qr"><QRCodeCanvas value={offlinePairing.offerUrl} size={260} level="L" marginSize={2} /><strong>1. Scan this on the scoring device</strong><span>It will display a response QR.</span></div>
+                  <details className="offline-code-fallback"><summary>Scorer cannot scan? Copy organizer offer code</summary><textarea readOnly value={offlinePairing.offerCode || ""} onFocus={(event) => event.target.select()} /></details>
                   <div className="offline-answer-actions"><strong>2. Scan the response QR</strong><button className="button button-primary" type="button" onClick={() => setShowOfflineScanner(true)}><Camera size={17} /> Scan response</button></div>
                   {showOfflineScanner && <QrScanner title="Scan scorer response" onClose={() => setShowOfflineScanner(false)} onResult={acceptOfflineAnswer} />}
-                  <label>Or paste the response code<input value={offlineAnswer} onChange={(event) => setOfflineAnswer(event.target.value)} placeholder="pickleflow-answer:…" /></label>
+                  <label>Or paste the response code from the scoring device<textarea value={offlineAnswer} onChange={(event) => setOfflineAnswer(event.target.value)} placeholder="pickleflow-answer:…" /></label>
                   <button className="button button-secondary" type="button" disabled={!offlineAnswer.trim()} onClick={() => acceptOfflineAnswer()}>Use response code</button>
                 </> : <button className="button button-secondary" type="button" onClick={beginOfflinePairing}>Try again</button>}
               {offlinePairing?.court.id === scoringLink.court.id && offlinePairing.status === "connected" && <p className="offline-connected"><Check size={16} /> Fully offline connection established.</p>}

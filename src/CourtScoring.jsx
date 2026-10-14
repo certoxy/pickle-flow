@@ -26,6 +26,8 @@ export default function CourtScoring({ token }) {
   const [directState, setDirectState] = useState("pairing");
   const [offlineAnswer, setOfflineAnswer] = useState("");
   const [offlineError, setOfflineError] = useState("");
+  const [offlineOfferInput, setOfflineOfferInput] = useState("");
+  const [acceptingOfflineOffer, setAcceptingOfflineOffer] = useState(false);
   const [servingTeam, setServingTeam] = useState(1);
   const [serveNumber, setServeNumber] = useState(1);
   const syncTimer = useRef(null);
@@ -34,6 +36,47 @@ export default function CourtScoring({ token }) {
   const offlineSync = useRef(null);
   const activeGameId = view?.game?.id;
   const hasActiveGame = Boolean(activeGameId);
+
+  function acknowledgeDirectScore(ack) {
+    const pending = pendingScoreForCourt(token, ack.gameId);
+    if (
+      pending &&
+      Number(pending.one) === Number(ack.one) &&
+      Number(pending.two) === Number(ack.two)
+    ) {
+      acknowledgePendingScore(pending);
+      setPendingCount(0);
+    }
+  }
+
+  async function acceptOfflineOffer(offer) {
+    if (!offer?.trim() || acceptingOfflineOffer) return;
+    setAcceptingOfflineOffer(true);
+    setOfflineError("");
+    directSync.current?.close();
+    directSync.current = null;
+    offlineSync.current?.close();
+    offlineSync.current = createOfflineScorerSync({
+      onStatus: setDirectState,
+      onAck: acknowledgeDirectScore,
+      onView: (nextView) => {
+        cacheCourtView(token, nextView);
+        setView(applyPendingScore(nextView));
+        setLoading(false);
+        setMessage("");
+      },
+    });
+    try {
+      setDirectState("pairing");
+      const answer = await offlineSync.current.acceptOffer(offer.trim());
+      setOfflineAnswer(`pickleflow-answer:${answer}`);
+      setOfflineOfferInput("");
+    } catch (error) {
+      setOfflineError(error.message);
+    } finally {
+      setAcceptingOfflineOffer(false);
+    }
+  }
 
   useEffect(() => {
     if (!activeGameId) return;
@@ -120,32 +163,9 @@ export default function CourtScoring({ token }) {
   }, [activeGameId, token]);
 
   useEffect(() => {
-    const acknowledgeDirectScore = (ack) => {
-      const pending = pendingScoreForCourt(token, ack.gameId);
-      if (
-        pending &&
-        Number(pending.one) === Number(ack.one) &&
-        Number(pending.two) === Number(ack.two)
-      ) {
-        acknowledgePendingScore(pending);
-        setPendingCount(0);
-      }
-    };
     const offer = new URLSearchParams(window.location.search).get("offlineOffer");
     if (offer) {
-      offlineSync.current = createOfflineScorerSync({
-        onStatus: setDirectState,
-        onAck: acknowledgeDirectScore,
-        onView: (nextView) => {
-          cacheCourtView(token, nextView);
-          setView(applyPendingScore(nextView));
-          setLoading(false);
-          setMessage("");
-        },
-      });
-      offlineSync.current.acceptOffer(offer)
-        .then((answer) => setOfflineAnswer(`pickleflow-answer:${answer}`))
-        .catch((error) => setOfflineError(error.message));
+      acceptOfflineOffer(offer);
     } else {
       directSync.current = createScorerDirectSync({
         token,
@@ -244,6 +264,15 @@ export default function CourtScoring({ token }) {
     window.localStorage.setItem(`pickleflow-serving-${activeGameId}`, `${nextTeam}:${nextServe}`);
   }
 
+  async function copyOfflineAnswer() {
+    try {
+      await navigator.clipboard.writeText(offlineAnswer);
+      setMessage("Response code copied. Paste it into the organizer’s Step 2 field.");
+    } catch {
+      setMessage("Select and copy the response code below.");
+    }
+  }
+
   if (loading) return <main className="court-scoring-page"><p>Loading court…</p></main>;
   if (!view) return <main className="court-scoring-page"><section className="scorer-empty"><h1>Scoring link unavailable</h1><p>{message || "Connect to the internet once to open this scoring link."}</p></section></main>;
   const reached = view.game && Math.max(view.game.team_one_score, view.game.team_two_score) >= view.game.points_to_win && view.game.team_one_score !== view.game.team_two_score;
@@ -268,8 +297,14 @@ export default function CourtScoring({ token }) {
       </div>
       <div className={`direct-score-status ${directState}`} role="status">
         <Radio size={17} />
-        <span>{directState === "connected" ? "Direct to organizer · Connected" : directState === "unsupported" ? "Direct sync is not supported on this browser" : directState === "error" ? "Direct sync unavailable · online scoring remains active" : "Pairing directly with organizer…"}</span>
+        <span>{directState === "connected" ? "Direct to organizer · Connected" : directState === "answer-ready" ? "Response ready · complete Step 2 on the organizer" : directState === "connecting" ? "Connecting directly to organizer…" : directState === "unsupported" ? "Direct sync is not supported on this browser" : directState === "error" ? "Direct sync unavailable · check the code and local network" : "Pairing directly with organizer…"}</span>
       </div>
+      {directState !== "connected" && !offlineAnswer && <details className="offline-manual-pairing">
+        <summary>Pair fully offline with an organizer code</summary>
+        <p>Paste the <strong>organizer offer code</strong> here. This device will then create a response code for the organizer.</p>
+        <textarea value={offlineOfferInput} onChange={(event) => setOfflineOfferInput(event.target.value)} placeholder="pickleflow-offer:…" />
+        <button type="button" className="button button-primary" disabled={!offlineOfferInput.trim() || acceptingOfflineOffer} onClick={() => acceptOfflineOffer(offlineOfferInput)}>{acceptingOfflineOffer ? "Creating response…" : "Accept organizer code"}</button>
+      </details>}
       {offlineError && <div className="form-message error">Offline pairing failed: {offlineError}</div>}
       {message && <div className="form-message error">{message}</div>}
       {view.game ? (
@@ -313,7 +348,7 @@ export default function CourtScoring({ token }) {
         <h2>Scan this response on the organizer device</h2>
         <QRCodeCanvas value={offlineAnswer} size={270} level="L" marginSize={2} />
         <p>Keep this page open. The connection status will update automatically.</p>
-        <details><summary>Response code fallback</summary><textarea readOnly value={offlineAnswer} onFocus={(event) => event.target.select()} /></details>
+        <details><summary>Response code fallback</summary><textarea readOnly value={offlineAnswer} onFocus={(event) => event.target.select()} /><button type="button" className="button button-secondary" onClick={copyOfflineAnswer}>Copy response code</button></details>
       </section>}
       {view.next_game && <p className="scorer-next">Next: Game {view.next_game.game_number}</p>}
       <p className="scorer-note">Scores are saved on this device during a temporary connection loss and sync automatically when online.</p>
