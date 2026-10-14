@@ -1404,7 +1404,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             const liveScore = liveGame ? scores[liveGame.id] || { one: liveGame.team_one_score || 0, two: liveGame.team_two_score || 0 } : null;
             return <button type="button" key={court.id} className={`court-overview-card ${monitoredCourt === court.id ? "selected" : ""} ${liveGame ? "playing" : readyGame ? "ready" : "available"}`} onClick={() => setMonitoredCourt(court.id)}>
               <span>{court.name}</span>
-              {liveGame ? <><strong>{liveScore.one} <small>–</small> {liveScore.two}</strong><em>Game {liveGame.game_number} · Playing</em></>
+              {liveGame ? <><strong>{liveScore.one} <small>–</small> {liveScore.two}</strong><em>Game {liveGame.game_number} · Playing</em><em className="court-serving">Team {liveGame.serving_team || 1} serving · Serve {liveGame.serve_number || 1}</em></>
                 : readyGame ? <><strong>Game {readyGame.game_number}</strong><em>Ready to start</em></>
                   : <><strong>Available</strong><em>Waiting for match</em></>}
             </button>;

@@ -81,10 +81,24 @@ export default function CourtScoring({ token }) {
   useEffect(() => {
     if (!activeGameId) return;
     const saved = window.localStorage.getItem(`pickleflow-serving-${activeGameId}`);
-    const [team, serve] = String(saved || "1:1").split(":").map(Number);
+    const persisted = view?.game?.serving_team && view?.game?.serve_number
+      ? `${view.game.serving_team}:${view.game.serve_number}`
+      : saved || "1:1";
+    const [team, serve] = String(persisted).split(":").map(Number);
     setServingTeam(team === 2 ? 2 : 1);
     setServeNumber(serve === 2 ? 2 : 1);
-  }, [activeGameId]);
+  }, [activeGameId, view?.game?.serving_team, view?.game?.serve_number]);
+
+  async function saveServingState(team, serve) {
+    if (!activeGameId || !navigator.onLine) return;
+    const { error } = await supabase.rpc("update_court_service", {
+      p_token: token,
+      p_game_id: activeGameId,
+      p_serving_team: team,
+      p_serve_number: serve,
+    });
+    if (error) setMessage(`Serving indicator could not sync: ${error.message}`);
+  }
 
   const applyPendingScore = useCallback((data) => {
     if (!data?.game) return data;
@@ -253,6 +267,7 @@ export default function CourtScoring({ token }) {
     setServingTeam(team);
     setServeNumber(1);
     window.localStorage.setItem(`pickleflow-serving-${activeGameId}`, `${team}:1`);
+    saveServingState(team, 1);
   }
 
   function advanceServe() {
@@ -262,6 +277,7 @@ export default function CourtScoring({ token }) {
     setServingTeam(nextTeam);
     setServeNumber(nextServe);
     window.localStorage.setItem(`pickleflow-serving-${activeGameId}`, `${nextTeam}:${nextServe}`);
+    saveServingState(nextTeam, nextServe);
   }
 
   async function copyOfflineAnswer() {
