@@ -81,6 +81,12 @@ a {
   align-items: center;
   gap: 10px;
 }
+.topbar-dashboard-nav {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 14px;
+}
 .logout-donation-dialog {
   width: min(440px, calc(100vw - 32px));
   padding: 30px;
@@ -921,10 +927,26 @@ select:focus {
   padding-top: 40px;
 }
 .welcome-card {
+  position: relative;
   margin-bottom: 20px;
   padding: 34px;
   background: linear-gradient(135deg, white, #f1f8e4);
 }
+.welcome-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+}
+.welcome-close:hover { color: var(--navy); background: white; }
 .welcome-card h1 {
   margin: 10px 0 8px;
   color: var(--navy);
@@ -1039,6 +1061,7 @@ select:focus {
   border-radius: 13px;
   background: white;
 }
+.topbar-dashboard-nav .dashboard-tabs { margin: 0; white-space: nowrap; }
 .dashboard-tabs button {
   border: 0;
   border-radius: 9px;
@@ -1053,6 +1076,22 @@ select:focus {
   background: var(--navy);
 }
 .dashboard-tabs a { padding: 9px 15px; border-radius: 9px; color: var(--muted); font-weight: 800; text-decoration: none; }
+@media (max-width: 1050px) {
+  .topbar:has(.topbar-dashboard-nav) {
+    height: auto;
+    min-height: 76px;
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+  }
+  .topbar-dashboard-nav {
+    order: 3;
+    width: 100%;
+    margin: 0;
+  }
+  .topbar-dashboard-nav .dashboard-tabs { width: 100%; }
+  .topbar-dashboard-nav .dashboard-tabs button,
+  .topbar-dashboard-nav .dashboard-tabs a { flex: 1 0 auto; text-align: center; }
+}
 .active-event-meter { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 22px; padding: 18px 20px; border: 1px solid #cfe0ee; border-radius: 18px; background: linear-gradient(135deg,#fff,#eff8ff); }
 .active-event-meter span,.active-event-meter small { display:block; color:var(--muted); }
 .active-event-meter strong { display:block; margin:3px 0; color:var(--navy); font-size:1.65rem; }
@@ -2478,12 +2517,14 @@ select:focus-visible {
     padding: 20px 14px 56px;
   }
   .topbar {
-    height: 66px;
+    height: auto;
+    min-height: 66px;
     padding: 0 14px;
     border-bottom: 1px solid rgba(220, 231, 239, 0.8);
     background: rgba(245, 249, 252, 0.92);
     backdrop-filter: blur(14px);
   }
+  .topbar:has(.topbar-dashboard-nav) { padding-bottom: 8px; }
   .brand img {
     width: 138px;
     height: 46px;

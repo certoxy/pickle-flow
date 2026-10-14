@@ -238,7 +238,7 @@ function parseCsv(text) {
   return rows;
 }
 
-function Header({ session, onSignOut }) {
+function Header({ session, onSignOut, dashboardNavigation }) {
   const [showDonationPrompt, setShowDonationPrompt] = useState(false);
 
   function finishSignOut(donate = false) {
@@ -253,6 +253,9 @@ function Header({ session, onSignOut }) {
         <a className="brand" href="/" aria-label="PickleFlow home">
           <img src="/brand/pickleflow-logo.png" alt="PickleFlow" />
         </a>
+        {dashboardNavigation && (
+          <div className="topbar-dashboard-nav">{dashboardNavigation}</div>
+        )}
         <div className="topbar-actions">
           <a className="button button-suggest" href="/suggest" aria-label="Suggest an app improvement"><MessageSquarePlus size={17} /> Suggest App Improvements</a>
           <a className="button button-donate" href="/donate" aria-label="Donate to PickleFlow"><Heart size={17} /> Donate</a>
@@ -2150,9 +2153,10 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
   );
 }
 
-function Dashboard({ session }) {
+function Dashboard({ session, onSignOut }) {
   const dashboardStateKey = `pickleflow-dashboard-${session.user.id}`;
   const walkthroughKey = `pickleflow-onboarding-seen-${session.user.id}`;
+  const welcomeKey = `pickleflow-welcome-dismissed-${session.user.id}`;
   const [profile, setProfile] = useState(emptyProfile),
     [events, setEvents] = useState([]),
     [archives, setArchives] = useState([]),
@@ -2162,6 +2166,9 @@ function Dashboard({ session }) {
     [allowance, setAllowance] = useState({ active_count: 0, event_limit: 3, additional_events: 0 }),
     [isAdmin, setIsAdmin] = useState(false),
     [saved, setSaved] = useState(""),
+    [showWelcome, setShowWelcome] = useState(
+      () => !window.localStorage.getItem(welcomeKey),
+    ),
     [showWalkthrough, setShowWalkthrough] = useState(false),
     [loading, setLoading] = useState(true);
   async function loadEvents() {
@@ -2226,6 +2233,10 @@ function Dashboard({ session }) {
     window.localStorage.setItem(walkthroughKey, "true");
     setShowWalkthrough(false);
   }
+  function closeWelcome() {
+    window.localStorage.setItem(welcomeKey, "true");
+    setShowWelcome(false);
+  }
   useEffect(() => {
     if (loading) return;
     if (selectedEvent && ["players", "edit", "game-day"].includes(view)) {
@@ -2256,9 +2267,34 @@ function Dashboard({ session }) {
     setEvents(events.map((event) => (event.id === item.id ? item : event)));
     setSelectedEvent(item);
   }
+  const dashboardNavigation = (
+    <nav className="dashboard-tabs" aria-label="Organizer navigation">
+      <button
+        className={view !== "profile" ? "active" : ""}
+        onClick={() => setView("events")}
+      >
+        Events
+      </button>
+      <button
+        className={view === "profile" ? "active" : ""}
+        onClick={() => setView("profile")}
+      >
+        Organizer profile
+      </button>
+      {isAdmin && <a href="/admin">Platform Admin</a>}
+    </nav>
+  );
   return (
-    <main className="dashboard">
+    <>
+      <Header
+        session={session}
+        onSignOut={onSignOut}
+        dashboardNavigation={dashboardNavigation}
+      />
+      <main className="dashboard">
+      {showWelcome && view !== "game-day" && (
       <section className="welcome-card">
+        <button className="welcome-close" type="button" aria-label="Close welcome banner" onClick={closeWelcome}><X size={20} /></button>
         <span className="eyebrow">
           <ShieldCheck size={15} /> Organizer account
         </span>
@@ -2272,21 +2308,7 @@ function Dashboard({ session }) {
         </p>
         <button className="welcome-guide-button" type="button" onClick={() => setShowWalkthrough(true)}><HelpCircle size={18} /> Show me how</button>
       </section>
-      <nav className="dashboard-tabs">
-        <button
-          className={view !== "profile" ? "active" : ""}
-          onClick={() => setView("events")}
-        >
-          Events
-        </button>
-        <button
-          className={view === "profile" ? "active" : ""}
-          onClick={() => setView("profile")}
-        >
-          Organizer profile
-        </button>
-        {isAdmin && <a href="/admin">Platform Admin</a>}
-      </nav>
+      )}
       {view === "events" && (
         <EventList
           events={events}
@@ -2416,7 +2438,8 @@ function Dashboard({ session }) {
           </form>
         </section>
       )}
-    </main>
+      </main>
+    </>
   );
 }
 
@@ -2860,24 +2883,29 @@ export default function App() {
     );
   return (
     <div className="app">
-      <Header session={session} onSignOut={() => supabase.auth.signOut()} />
       {loading ? (
-        <main className="dashboard">
-          <p>Loading PickleFlow…</p>
-        </main>
+        <>
+          <Header session={session} onSignOut={() => supabase.auth.signOut()} />
+          <main className="dashboard">
+            <p>Loading PickleFlow…</p>
+          </main>
+        </>
       ) : session ? (
-        <Dashboard session={session} />
+        <Dashboard session={session} onSignOut={() => supabase.auth.signOut()} />
       ) : (
-        <Landing
-          onStart={() => {
-            setAuthMode("signup");
-            setShowAuth(true);
-          }}
-          onLogin={() => {
-            setAuthMode("signin");
-            setShowAuth(true);
-          }}
-        />
+        <>
+          <Header />
+          <Landing
+            onStart={() => {
+              setAuthMode("signup");
+              setShowAuth(true);
+            }}
+            onLogin={() => {
+              setAuthMode("signin");
+              setShowAuth(true);
+            }}
+          />
+        </>
       )}
       {!session && showAuth && (
         <AuthPanel
