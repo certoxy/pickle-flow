@@ -2,16 +2,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowLeft,
+  ArrowRight,
   CalendarDays,
   CheckCircle2,
   Copy,
   Download,
   Edit3,
   Heart,
+  HelpCircle,
   FileUp,
   LogOut,
   LocateFixed,
   MapPin,
+  MonitorUp,
   Phone,
   Plus,
   Search,
@@ -22,6 +25,8 @@ import {
   Trophy,
   UserPlus,
   Users,
+  WifiOff,
+  X,
   XCircle,
 } from "lucide-react";
 import L from "leaflet";
@@ -295,8 +300,8 @@ function Landing({ onStart, onLogin }) {
             </span>
             <h1>Run pickleball events without the spreadsheet shuffle.</h1>
             <p>
-              Create events, share a player-registration link, and keep every
-              signup organized in one place.
+              Register players, build fair matches, score every court from a
+              phone, and keep your whole venue updated on one live board.
             </p>
             <div className="hero-actions">
               <button className="button button-primary" onClick={onStart}>
@@ -355,6 +360,21 @@ function Landing({ onStart, onLogin }) {
               <p>Assign matches by court, score from a phone, and update the shared Match Board automatically.</p>
             </article>
           </div>
+          <section className="new-features-section">
+            <div className="new-features-heading">
+              <span className="eyebrow"><Sparkles size={15} /> Built for a smoother game day</span>
+              <h2>More play. Less calling names and updating scoreboards.</h2>
+              <p>PickleFlow now connects the organizer, court scorers, players, and the venue display in one simple flow.</p>
+            </div>
+            <div className="new-feature-grid">
+              <article><Swords /><div><h3>Automatic next matches</h3><p>Build the next fair pairing from the waiting queue, then assign it when a court becomes available.</p></div></article>
+              <article><Phone /><div><h3>Mobile court scoring</h3><p>Give each court its own scoring link or QR code. Scores and the serving team update live.</p></div></article>
+              <article><MonitorUp /><div><h3>Live venue Match Board</h3><p>Show active scores, who is serving, the player queue, upcoming match, and recent winners on a TV.</p></div></article>
+              <article><WifiOff /><div><h3>Temporary offline scoring</h3><p>Keep score on the scoring phone during a short internet interruption and sync it when the connection returns.</p></div></article>
+              <article><UserPlus /><div><h3>Flexible player management</h3><p>Import players, add walk-ins, prevent duplicate names, substitute players, and track check-in status.</p></div></article>
+              <article><Download /><div><h3>Share and export</h3><p>Use QR codes for registration and displays, then export a designed PDF containing the full event details.</p></div></article>
+            </div>
+          </section>
           <div className="product-showcase">
             <article className="showcase-card">
               <img src="/product-previews/event-roster.svg" alt="PickleFlow event roster and player management screen" />
@@ -419,6 +439,37 @@ function Landing({ onStart, onLogin }) {
       <footer>PickleFlow · A PAOTECHS-powered community project</footer>
     </>
   );
+}
+
+const organizerWalkthroughSteps = [
+  { icon: CalendarDays, title: "Create your event", text: "Tap New Event. Add the event name, date, place, player limit, and points needed to win.", tip: "Start here. You can edit these details later." },
+  { icon: UserPlus, title: "Invite your players", text: "Open the event and share its registration link or QR code. Players can register without creating an account.", tip: "You can also import a list or add a walk-in yourself." },
+  { icon: CheckCircle2, title: "Check players in", text: "On game day, tap Check In when a player arrives. Then tap Join Queue when the player is ready to play.", tip: "Waiting means the player is ready. In-Game means the player is currently on a court." },
+  { icon: Swords, title: "Let PickleFlow build matches", text: "Turn on Auto-assign next players. PickleFlow creates the next match from the waiting queue and keeps it ready for an open court.", tip: "You still control which court receives the match." },
+  { icon: Phone, title: "Score from any phone", text: "Open a court’s scoring QR code on a phone. Tap the serving team’s plus button and change the serve after a side-out.", tip: "The organizer confirms the game before it is completed." },
+  { icon: MonitorUp, title: "Open the Match Board", text: "Tap Match Board and open the link on a smart TV, laptop, or tablet. Everyone can see scores, serving team, queue, and winners.", tip: "The board updates automatically while online." },
+  { icon: Trophy, title: "That’s it—you’re ready!", text: "Complete each game, move waiting players into the next match, and export the event when you are finished.", tip: "You cannot break anything. Take it one button at a time." },
+];
+
+function OrganizerWalkthrough({ onClose }) {
+  const [step, setStep] = useState(0);
+  const item = organizerWalkthroughSteps[step];
+  const Icon = item.icon;
+  const finish = () => onClose();
+  return <div className="modal-backdrop onboarding-backdrop" role="presentation" onMouseDown={finish}>
+    <section className="onboarding-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-title" onMouseDown={(event) => event.stopPropagation()}>
+      <header><div><span>Easy Organizer Guide</span><strong>{step + 1} of {organizerWalkthroughSteps.length}</strong></div><button type="button" onClick={finish} aria-label="Close guide"><X /></button></header>
+      <div className="onboarding-progress" aria-label={`Step ${step + 1} of ${organizerWalkthroughSteps.length}`}><span style={{ width: `${((step + 1) / organizerWalkthroughSteps.length) * 100}%` }} /></div>
+      <div className="onboarding-visual"><Icon /></div>
+      <div className="onboarding-copy"><span className="eyebrow">Step {step + 1}</span><h2 id="onboarding-title">{item.title}</h2><p>{item.text}</p><aside><Sparkles /> <span>{item.tip}</span></aside></div>
+      <footer>
+        <button className="onboarding-skip" type="button" onClick={finish}>Skip for now</button>
+        <div>{step > 0 && <button className="button button-secondary" type="button" onClick={() => setStep(step - 1)}><ArrowLeft size={17} /> Back</button>}
+          {step < organizerWalkthroughSteps.length - 1 ? <button className="button button-primary" type="button" onClick={() => setStep(step + 1)}>Next <ArrowRight size={17} /></button> : <button className="button button-primary" type="button" onClick={finish}><CheckCircle2 size={17} /> Start organizing</button>}
+        </div>
+      </footer>
+    </section>
+  </div>;
 }
 
 function DonationPage() {
@@ -2050,6 +2101,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
 
 function Dashboard({ session }) {
   const dashboardStateKey = `pickleflow-dashboard-${session.user.id}`;
+  const walkthroughKey = `pickleflow-onboarding-seen-${session.user.id}`;
   const [profile, setProfile] = useState(emptyProfile),
     [events, setEvents] = useState([]),
     [archives, setArchives] = useState([]),
@@ -2059,6 +2111,7 @@ function Dashboard({ session }) {
     [allowance, setAllowance] = useState({ active_count: 0, event_limit: 3, additional_events: 0 }),
     [isAdmin, setIsAdmin] = useState(false),
     [saved, setSaved] = useState(""),
+    [showWalkthrough, setShowWalkthrough] = useState(false),
     [loading, setLoading] = useState(true);
   async function loadEvents() {
     const [eventResult, archiveResult, allowanceResult] = await Promise.all([
@@ -2097,6 +2150,7 @@ function Dashboard({ session }) {
       setArchives(archiveResult.data || []);
       if (allowanceResult.data?.[0]) setAllowance(allowanceResult.data[0]);
       setIsAdmin(Boolean(adminResult.data));
+      if (!loadedEvents.length && !window.localStorage.getItem(walkthroughKey)) setShowWalkthrough(true);
       try {
         const savedState = JSON.parse(
           window.localStorage.getItem(dashboardStateKey) || "null",
@@ -2117,6 +2171,10 @@ function Dashboard({ session }) {
       setLoading(false);
     });
   }, [session.user.id]);
+  function closeWalkthrough() {
+    window.localStorage.setItem(walkthroughKey, "true");
+    setShowWalkthrough(false);
+  }
   useEffect(() => {
     if (loading) return;
     if (selectedEvent && ["players", "edit", "game-day"].includes(view)) {
@@ -2161,6 +2219,7 @@ function Dashboard({ session }) {
           Create an event and share its link so players can register without
           creating an account.
         </p>
+        <button className="welcome-guide-button" type="button" onClick={() => setShowWalkthrough(true)}><HelpCircle size={18} /> Show me how</button>
       </section>
       <nav className="dashboard-tabs">
         <button
@@ -2246,6 +2305,7 @@ function Dashboard({ session }) {
           onBack={() => setView("players")}
         />
       )}
+      {showWalkthrough && <OrganizerWalkthrough onClose={closeWalkthrough} />}
       {view === "profile" && (
         <section className="profile-card">
           <h2>Organizer profile</h2>
