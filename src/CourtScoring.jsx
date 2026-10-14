@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CircleDot, Clock3, Heart, Lock, Minus, Plus, Radio, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CircleDot, Clock3, Heart, Lock, Minus, Plus, Radio, RefreshCw, Trophy, Wifi, WifiOff } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import { supabase } from "./lib/supabase";
 import {
@@ -277,7 +277,11 @@ export default function CourtScoring({ token }) {
           <span className="eyebrow">Live · Game {view.game.game_number}</span>
           <h1>First to {view.game.points_to_win}</h1>
           <button type="button" className={`serve-guide team-${servingTeam}`} onClick={advanceServe} aria-label={`Team ${servingTeam}, serve ${serveNumber}. Advance serve.`}>
-            <span className="serve-arrows">{servingTeam === 1 ? (serveNumber === 1 ? "<" : "<<") : serveNumber === 1 ? ">" : ">>"}</span>
+            <span className="serve-arrows" aria-hidden="true">
+              {servingTeam === 1
+                ? serveNumber === 1 ? <ChevronLeft /> : <ChevronsLeft />
+                : serveNumber === 1 ? <ChevronRight /> : <ChevronsRight />}
+            </span>
             <span><strong>Team {servingTeam} · Serve {serveNumber}</strong><small>Tap after a side-out</small></span>
           </button>
           <div className="scorer-teams">

@@ -3045,7 +3045,8 @@ select:focus-visible {
 .serve-guide > span:last-child { display: grid; text-align: left; }
 .serve-guide strong { font-size: .8rem; }
 .serve-guide small { margin-top: 2px; color: #60803d; font-size: .68rem; }
-.serve-arrows { color: #4f8e18; font: 1000 1.65rem/1 ui-monospace, monospace; letter-spacing: -.16em; }
+.serve-arrows { display: grid; place-items: center; color: #4f8e18; }
+.serve-arrows svg { width: 34px; height: 34px; stroke-width: 3; }
 .serve-guide.team-1 .serve-arrows { text-align: right; }
 .serve-guide.team-2 .serve-arrows { text-align: left; }
 .scorer-teams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
