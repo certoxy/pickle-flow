@@ -304,12 +304,12 @@ function Landing({ onStart, onLogin }) {
         <section className="hero">
           <div className="hero-copy">
             <span className="eyebrow">
-              <Sparkles size={15} /> Free for organizers
+              <Sparkles size={15} /> Now with Offline Game Day
             </span>
             <h1>Run pickleball events without the spreadsheet shuffle.</h1>
             <p>
               Register players, build fair matches, score every court from a
-              phone, and keep your whole venue updated on one live board.
+              phone, and keep Game Day moving—even through temporary internet interruptions.
             </p>
             <div className="hero-actions">
               <button className="button button-primary" onClick={onStart}>
@@ -370,17 +370,17 @@ function Landing({ onStart, onLogin }) {
           </div>
           <section className="new-features-section">
             <div className="new-features-heading">
-              <span className="eyebrow"><Sparkles size={15} /> Built for a smoother game day</span>
-              <h2>More play. Less calling names and updating scoreboards.</h2>
-              <p>PickleFlow now connects the organizer, court scorers, players, and the venue display in one simple flow.</p>
+              <span className="eyebrow"><Sparkles size={15} /> Latest PickleFlow additions</span>
+              <h2>Game Day keeps moving—even when the internet does not.</h2>
+              <p>Manage players, fair pairings, courts, scores, and results from one organizer workspace, with offline changes safely synchronized after reconnection.</p>
             </div>
             <div className="new-feature-grid">
-              <article><Swords /><div><h3>Automatic next matches</h3><p>Build the next fair pairing from the waiting queue, then assign it when a court becomes available.</p></div></article>
-              <article><Phone /><div><h3>Mobile court scoring</h3><p>Give each court its own scoring link or QR code. Scores and the serving team update live.</p></div></article>
-              <article><MonitorUp /><div><h3>Live venue Match Board</h3><p>Show active scores, who is serving, the player queue, upcoming match, and recent winners on a TV.</p></div></article>
-              <article><WifiOff /><div><h3>Temporary offline scoring</h3><p>Keep score on the scoring phone during a short internet interruption and sync it when the connection returns.</p></div></article>
-              <article><UserPlus /><div><h3>Flexible player management</h3><p>Import players, add walk-ins, prevent duplicate names, substitute players, and track check-in status.</p></div></article>
-              <article><Download /><div><h3>Share and export</h3><p>Use QR codes for registration and displays, then export a designed PDF containing the full event details.</p></div></article>
+              <article><WifiOff /><div><h3>Offline Game Day</h3><p>Add and check in players, update statuses, manage the queue, assign matches, and record scores locally. Changes sync automatically when internet returns.</p></div></article>
+              <article><Swords /><div><h3>Fair Open Play rotation</h3><p>Prioritize players with fewer games and rotate partners whenever possible before repeating a pairing.</p></div></article>
+              <article><Activity /><div><h3>Automatic next matches</h3><p>Prepare the next fair pairing while courts are occupied, then assign it automatically when a court becomes available.</p></div></article>
+              <article><Phone /><div><h3>Live mobile scoring</h3><p>Score each court from a phone, track first and second serve, and update the organizer dashboard instantly.</p></div></article>
+              <article><Trophy /><div><h3>Champion and player highlights</h3><p>Calculate the Open Play champion, winning percentage, total scores, and downloadable Top 5 images.</p></div></article>
+              <article><MonitorUp /><div><h3>Live venue Match Board</h3><p>Show active scores, who is serving, the waiting queue, court-pending matches, and recent winners on a TV.</p></div></article>
             </div>
           </section>
           <div className="product-showcase">
