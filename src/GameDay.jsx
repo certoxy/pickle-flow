@@ -371,6 +371,104 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         .slice(0, 5),
     [standings],
   );
+  const completedGameIds = useMemo(
+    () => new Set(completedGames.map((game) => game.id)),
+    [completedGames],
+  );
+  const playerGameCounts = useMemo(() => {
+    const counts = new Map();
+    gamePlayers.forEach((entry) => {
+      if (!completedGameIds.has(entry.game_id)) return;
+      counts.set(
+        entry.player_registration_id,
+        (counts.get(entry.player_registration_id) || 0) + 1,
+      );
+    });
+    return counts;
+  }, [completedGameIds, gamePlayers]);
+  const partnerCounts = useMemo(() => {
+    const counts = new Map();
+    completedGames.forEach((game) => {
+      [1, 2].forEach((team) => {
+        const teammates = gamePlayers
+          .filter(
+            (entry) =>
+              entry.game_id === game.id && entry.team_number === team,
+          )
+          .map((entry) => entry.player_registration_id);
+        if (teammates.length !== 2) return;
+        const key = [...teammates].sort().join(":");
+        counts.set(key, (counts.get(key) || 0) + 1);
+      });
+    });
+    return counts;
+  }, [completedGames, gamePlayers]);
+
+  function partnershipCount(first, second) {
+    return partnerCounts.get([first, second].sort().join(":")) || 0;
+  }
+
+  function arrangeOpenPlayPartners(playerIds) {
+    if (event.game_format !== "open_play" || playerIds.length !== 4)
+      return playerIds;
+    const [a, b, c, d] = playerIds;
+    const options = [
+      [a, b, c, d],
+      [a, c, b, d],
+      [a, d, b, c],
+    ];
+    return options.sort(
+      (first, second) =>
+        partnershipCount(first[0], first[1]) +
+        partnershipCount(first[2], first[3]) -
+        partnershipCount(second[0], second[1]) -
+        partnershipCount(second[2], second[3]),
+    )[0];
+  }
+
+  function fairNextPlayerIds() {
+    const ranked = waiting
+      .map((entry, queueIndex) => ({
+        id: entry.player_registration_id,
+        gamesPlayed: playerGameCounts.get(entry.player_registration_id) || 0,
+        queueIndex,
+      }))
+      .sort(
+        (a, b) =>
+          a.gamesPlayed - b.gamesPlayed || a.queueIndex - b.queueIndex,
+      );
+    if (ranked.length < playersNeeded) return [];
+    if (event.game_format !== "open_play" || playersNeeded !== 4)
+      return ranked.slice(0, playersNeeded).map((player) => player.id);
+
+    // Search a fair-sized front pool. Games played is weighted first, then
+    // repeat partnerships, then queue order.
+    const pool = ranked.slice(0, Math.min(20, ranked.length));
+    let best = null;
+    for (let a = 0; a < pool.length - 3; a += 1)
+      for (let b = a + 1; b < pool.length - 2; b += 1)
+        for (let c = b + 1; c < pool.length - 1; c += 1)
+          for (let d = c + 1; d < pool.length; d += 1) {
+            const group = [pool[a], pool[b], pool[c], pool[d]];
+            const arranged = arrangeOpenPlayPartners(
+              group.map((player) => player.id),
+            );
+            const repeatedPartners =
+              partnershipCount(arranged[0], arranged[1]) +
+              partnershipCount(arranged[2], arranged[3]);
+            const gamesPlayed = group.reduce(
+              (total, player) => total + player.gamesPlayed,
+              0,
+            );
+            const queueCost = group.reduce(
+              (total, player) => total + player.queueIndex,
+              0,
+            );
+            const score = gamesPlayed * 1_000_000 + repeatedPartners * 10_000 + queueCost;
+            if (!best || score < best.score) best = { score, ids: arranged };
+          }
+    return best?.ids || ranked.slice(0, 4).map((player) => player.id);
+  }
 
   useEffect(() => {
     if (
@@ -436,9 +534,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     if (waiting.length < playersNeeded) return;
     setAutoAssigning(true);
     createMatchFor(
-      waiting
-        .slice(0, playersNeeded)
-        .map((entry) => entry.player_registration_id),
+      fairNextPlayerIds(),
       true,
     ).finally(() => setAutoAssigning(false));
   }, [
@@ -712,8 +808,19 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   async function addToQueue(playerId) {
+    const playerGames = playerGameCounts.get(playerId) || 0;
+    const otherCheckedIn = checkedIn.filter((player) => player.id !== playerId);
+    const prioritizeNewPlayer =
+      event.game_format === "open_play" &&
+      playerGames === 0 &&
+      otherCheckedIn.length > 0 &&
+      otherCheckedIn.every(
+        (player) => (playerGameCounts.get(player.id) || 0) > 0,
+      );
     const position = waiting.length
-      ? Math.max(...waiting.map((item) => item.position)) + 1
+      ? prioritizeNewPlayer
+        ? Math.min(...waiting.map((item) => item.position)) - 1
+        : Math.max(...waiting.map((item) => item.position)) + 1
       : 1;
     const { data, error } = await supabase
       .from("game_queue")
@@ -809,11 +916,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   function selectNextPlayers() {
-    setSelectedPlayers(
-      waiting
-        .slice(0, playersNeeded)
-        .map((entry) => entry.player_registration_id),
-    );
+    setSelectedPlayers(fairNextPlayerIds());
   }
 
   async function assignMatchToCourt(game, court) {
@@ -878,7 +981,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       setMessage(error.message);
       return false;
     }
-    const participants = playerIds.map((playerId, index) => ({
+    const orderedPlayerIds = arrangeOpenPlayPartners(playerIds);
+    const participants = orderedPlayerIds.map((playerId, index) => ({
       game_id: game.id,
       player_registration_id: playerId,
       team_number: index < teamSize ? 1 : 2,
@@ -896,13 +1000,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         .from("game_queue")
         .update({ status: "assigned" })
         .eq("event_id", event.id)
-        .in("player_registration_id", playerIds),
+        .in("player_registration_id", orderedPlayerIds),
     ]);
     setGames([game, ...games]);
     setGamePlayers([...gamePlayers, ...(inserted || [])]);
     setQueue(
       queue.map((entry) =>
-        playerIds.includes(entry.player_registration_id)
+        orderedPlayerIds.includes(entry.player_registration_id)
           ? { ...entry, status: "assigned" }
           : entry,
       ),
@@ -2102,7 +2206,6 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             )}
           </div>
         </section>
-      </div>
       <section className="leaderboard-section">
         <div className="leaderboard-heading"><div><span className="eyebrow"><Trophy size={15} /> Player highlights</span><h2>Top 5 leaderboards</h2></div><p>Updated from completed game results.</p></div>
         <div className="leaderboard-grid">
@@ -2118,6 +2221,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </article>
         </div>
       </section>
+      </div>
       </div>
     </section>
   );

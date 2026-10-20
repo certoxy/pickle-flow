@@ -1562,12 +1562,13 @@ select:focus {
 .game-day-main > section:last-child { grid-area: matches; }
 .game-day-management > section { grid-area: checkin; }
 .game-day-results > section:first-child { grid-area: standings; }
-.game-day-results > section:last-child { grid-area: recent; }
+.game-day-results > section:nth-child(2) { grid-area: recent; }
+.game-day-results > .leaderboard-section { grid-area: highlights; }
 
 @media (max-width: 900px) {
   .game-day-workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "checkin" "queue" "matches" "standings" "recent";
+    grid-template-areas: "checkin" "queue" "matches" "standings" "highlights" "recent";
   }
 }
 
@@ -1577,7 +1578,7 @@ select:focus {
     grid-template-areas:
       "checkin matches matches"
       "standings standings queue"
-      "standings standings recent";
+      "highlights highlights recent";
   }
   .game-day-workspace .queue-list,
   .game-day-workspace .result-list {
