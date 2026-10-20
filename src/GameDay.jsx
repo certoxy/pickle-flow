@@ -38,6 +38,13 @@ import {
   savePendingScore,
 } from "./lib/offlineScores";
 import { createOfflineOrganizerSync, createOrganizerDirectSync } from "./lib/directScoreSync";
+import {
+  acknowledgeGameDayOperation,
+  cacheGameDayState,
+  enqueueGameDayOperation,
+  getCachedGameDayState,
+  pendingGameDayOperations,
+} from "./lib/offlineGameDay";
 
 const playerName = (players, id) =>
   players.find((player) => player.id === id)?.full_name || "Unknown player";
@@ -77,6 +84,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [pendingScoreCount, setPendingScoreCount] = useState(
     () => pendingScoresForEvent(event.id).length,
   );
+  const [pendingOperationCount, setPendingOperationCount] = useState(
+    () => pendingGameDayOperations(event.id).length,
+  );
   const [directConnections, setDirectConnections] = useState({});
   const [offlinePairing, setOfflinePairing] = useState(null);
   const [offlineAnswer, setOfflineAnswer] = useState("");
@@ -99,6 +109,24 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   async function load() {
     setLoading(true);
+    if (!navigator.onLine) {
+      const cached = getCachedGameDayState(event.id);
+      if (cached) {
+        setPlayers(cached.players || []);
+        setCourts(cached.courts || []);
+        setQueue(cached.queue || []);
+        setGames(cached.games || []);
+        setGamePlayers(cached.gamePlayers || []);
+        setScores(cached.scores || {});
+        setPendingScoreCount(pendingScoresForEvent(event.id).length);
+        setPendingOperationCount(pendingGameDayOperations(event.id).length);
+        setMessage("Offline Game Day restored from this browser.");
+      } else {
+        setMessage("Connect once to load this event before using Offline Game Day.");
+      }
+      setLoading(false);
+      return;
+    }
     const [playerResult, courtResult, queueResult, gameResult] =
       await Promise.all([
         supabase
@@ -163,6 +191,18 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }, [games]);
 
   useEffect(() => {
+    if (loading || !players.length) return;
+    cacheGameDayState(event.id, {
+      players,
+      courts,
+      queue,
+      games,
+      gamePlayers,
+      scores,
+    });
+  }, [event.id, gamePlayers, games, loading, players, queue, scores, courts]);
+
+  useEffect(() => {
     courtDataRef.current = { players, gamePlayers, scores };
     offlineSyncs.current.forEach((sync, courtId) =>
       sync.sendView?.(buildOfflineCourtView(courtId)),
@@ -183,12 +223,16 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     };
     const handleOnline = () => {
       setIsOnline(true);
-      flushPendingScores();
+      syncOfflineGameDay();
     };
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);
-    if (navigator.onLine && pendingScoresForEvent(event.id).length)
-      flushPendingScores();
+    if (
+      navigator.onLine &&
+      (pendingGameDayOperations(event.id).length ||
+        pendingScoresForEvent(event.id).length)
+    )
+      syncOfflineGameDay();
     return () => {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
@@ -298,6 +342,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const isNextMatch = (game) =>
     game.status === "queued" && !game.court_id;
   const eventEnded = event.status === "completed";
+  const pendingChangeCount = pendingScoreCount + pendingOperationCount;
   const standings = useMemo(
     () =>
       checkedIn
@@ -964,6 +1009,25 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   async function assignMatchToCourt(game, court) {
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "assign_match", {
+        gameId: game.id,
+        courtId: court.id,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setGames((current) =>
+        current.map((item) =>
+          item.id === game.id ? { ...item, court_id: court.id } : item,
+        ),
+      );
+      setCourts((current) =>
+        current.map((item) =>
+          item.id === court.id ? { ...item, status: "in_use" } : item,
+        ),
+      );
+      setMessage(`Offline · Game ${game.game_number} assigned to ${court.name}.`);
+      return true;
+    }
     const { error } = await supabase
       .from("games")
       .update({ court_id: court.id })
@@ -1010,6 +1074,48 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     const gameNumber = games.length
       ? Math.max(...games.map((game) => game.game_number)) + 1
       : 1;
+    const orderedPlayerIds = arrangeOpenPlayPartners(playerIds);
+    if (!navigator.onLine) {
+      const game = {
+        id: crypto.randomUUID(),
+        event_id: event.id,
+        court_id: null,
+        game_number: gameNumber,
+        format: event.game_format,
+        points_to_win: event.points_to_win,
+        status: "queued",
+        team_one_score: 0,
+        team_two_score: 0,
+        winner_team: null,
+        started_at: null,
+        completed_at: null,
+        created_at: new Date().toISOString(),
+      };
+      const participants = orderedPlayerIds.map((playerId, index) => ({
+        id: crypto.randomUUID(),
+        game_id: game.id,
+        player_registration_id: playerId,
+        team_number: index < teamSize ? 1 : 2,
+      }));
+      enqueueGameDayOperation(event.id, "create_match", {
+        game,
+        participants,
+        playerIds: orderedPlayerIds,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setGames((current) => [game, ...current]);
+      setGamePlayers((current) => [...current, ...participants]);
+      setQueue((current) =>
+        current.map((entry) =>
+          orderedPlayerIds.includes(entry.player_registration_id)
+            ? { ...entry, status: "assigned" }
+            : entry,
+        ),
+      );
+      setSelectedPlayers([]);
+      setMessage(`Offline · Game ${gameNumber} paired and saved on this browser.`);
+      return true;
+    }
     const { data: game, error } = await supabase
       .from("games")
       .insert({
@@ -1025,7 +1131,6 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       setMessage(error.message);
       return false;
     }
-    const orderedPlayerIds = arrangeOpenPlayPartners(playerIds);
     const participants = orderedPlayerIds.map((playerId, index) => ({
       game_id: game.id,
       player_registration_id: playerId,
@@ -1218,6 +1323,22 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         "Complete the current match on this court before starting the next match.",
       );
     const started_at = new Date().toISOString();
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "start_game", {
+        gameId: game.id,
+        startedAt: started_at,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setGames((current) =>
+        current.map((item) =>
+          item.id === game.id
+            ? { ...item, status: "playing", started_at }
+            : item,
+        ),
+      );
+      setMessage(`Offline · Game ${game.game_number} started locally.`);
+      return;
+    }
     const { error } = await supabase
       .from("games")
       .update({ status: "playing", started_at })
@@ -1336,6 +1457,97 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       setCompletionPrompt({ game, score: next });
   }
 
+  async function syncOfflineGameDay() {
+    if (!navigator.onLine) return false;
+    const operations = pendingGameDayOperations(event.id);
+    setPendingOperationCount(operations.length);
+    setSyncState(operations.length ? "syncing" : "synced");
+    for (const operation of operations) {
+      const { type, payload } = operation;
+      let error = null;
+      if (type === "create_match") {
+        ({ error } = await supabase.from("games").upsert(payload.game));
+        if (!error)
+          ({ error } = await supabase
+            .from("game_players")
+            .upsert(payload.participants));
+        if (!error)
+          ({ error } = await supabase
+            .from("game_queue")
+            .update({ status: "assigned" })
+            .eq("event_id", event.id)
+            .in("player_registration_id", payload.playerIds));
+      } else if (type === "assign_match") {
+        ({ error } = await supabase
+          .from("games")
+          .update({ court_id: payload.courtId })
+          .eq("id", payload.gameId));
+        if (!error)
+          ({ error } = await supabase
+            .from("event_courts")
+            .update({ status: "in_use" })
+            .eq("id", payload.courtId));
+      } else if (type === "start_game") {
+        ({ error } = await supabase
+          .from("games")
+          .update({ status: "playing", started_at: payload.startedAt })
+          .eq("id", payload.gameId));
+      } else if (type === "complete_game") {
+        ({ error } = await supabase
+          .from("games")
+          .update({
+            status: "completed",
+            team_one_score: payload.one,
+            team_two_score: payload.two,
+            winner_team: payload.winnerTeam,
+            completed_at: payload.completedAt,
+          })
+          .eq("id", payload.gameId));
+        if (!error && payload.courtId)
+          ({ error } = await supabase
+            .from("event_courts")
+            .update({ status: "available" })
+            .eq("id", payload.courtId));
+        if (!error && payload.queueUpdates?.length) {
+          for (const update of payload.queueUpdates) {
+            const result = await supabase
+              .from("game_queue")
+              .update({
+                status: "waiting",
+                position: update.position,
+                joined_at: update.joinedAt,
+              })
+              .eq("event_id", event.id)
+              .eq("player_registration_id", update.playerId);
+            if (result.error) {
+              error = result.error;
+              break;
+            }
+          }
+        }
+      }
+      if (error) {
+        setSyncState("error");
+        setMessage(`Offline changes are safe on this browser and will retry: ${error.message}`);
+        return false;
+      }
+      acknowledgeGameDayOperation(operation.id);
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      if (type === "complete_game") {
+        pendingScoresForEvent(event.id)
+          .filter((entry) => entry.gameId === payload.gameId)
+          .forEach(acknowledgePendingScore);
+      }
+    }
+    const scoresSynced = await flushPendingScores();
+    if (!scoresSynced) return false;
+    setPendingOperationCount(0);
+    setSyncState("synced");
+    await load();
+    setMessage("Offline Game Day changes synced successfully.");
+    return true;
+  }
+
   async function flushPendingScores() {
     if (!navigator.onLine) return false;
     const pending = pendingScoresForEvent(event.id);
@@ -1353,14 +1565,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   async function completeGame(game, scoreOverride) {
-    if (!navigator.onLine) {
-      setMessage(
-        "You are offline. The score is safe on this device, but reconnect before completing the game.",
-      );
-      return false;
-    }
-    await (scoreSaveChains.current[game.id] || Promise.resolve());
-    if (pendingScoresForEvent(event.id).some((entry) => entry.gameId === game.id)) {
+    if (navigator.onLine)
+      await (scoreSaveChains.current[game.id] || Promise.resolve());
+    if (
+      navigator.onLine &&
+      pendingScoresForEvent(event.id).some((entry) => entry.gameId === game.id)
+    ) {
       const synced = await flushPendingScores();
       if (!synced) {
         setMessage("Please wait for the final score to sync before completing the game.");
@@ -1382,6 +1592,74 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     }
     const winner_team = one > two ? 1 : 2;
     const completed_at = new Date().toISOString();
+    const participantIds = gamePlayers
+      .filter((entry) => entry.game_id === game.id)
+      .map((entry) => entry.player_registration_id);
+    const queueEnd = waiting.length
+      ? Math.max(...waiting.map((entry) => entry.position))
+      : 0;
+    const returnedAt = new Date().toISOString();
+    const queueUpdates =
+      game.format === "open_play"
+        ? participantIds.map((playerId, index) => ({
+            playerId,
+            position: queueEnd + index + 1,
+            joinedAt: returnedAt,
+          }))
+        : [];
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "complete_game", {
+        gameId: game.id,
+        courtId: game.court_id,
+        one,
+        two,
+        winnerTeam: winner_team,
+        completedAt: completed_at,
+        queueUpdates,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      if (queueUpdates.length)
+        setQueue((current) =>
+          current.map((entry) => {
+            const update = queueUpdates.find(
+              (item) => item.playerId === entry.player_registration_id,
+            );
+            return update
+              ? {
+                  ...entry,
+                  status: "waiting",
+                  position: update.position,
+                  joined_at: update.joinedAt,
+                }
+              : entry;
+          }),
+        );
+      setGames((current) =>
+        current.map((item) =>
+          item.id === game.id
+            ? {
+                ...item,
+                status: "completed",
+                team_one_score: one,
+                team_two_score: two,
+                winner_team,
+                completed_at,
+              }
+            : item,
+        ),
+      );
+      setCourts((current) =>
+        current.map((court) =>
+          court.id === game.court_id
+            ? { ...court, status: "available" }
+            : court,
+        ),
+      );
+      setMessage(
+        `Offline · Game ${game.game_number} completed. The next match can continue now.`,
+      );
+      return true;
+    }
     const { error } = await supabase
       .from("games")
       .update({
@@ -1402,13 +1680,6 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .update({ status: nextCourtStatus })
       .eq("id", game.court_id);
     if (game.format === "open_play") {
-      const participantIds = gamePlayers
-        .filter((entry) => entry.game_id === game.id)
-        .map((entry) => entry.player_registration_id);
-      const queueEnd = waiting.length
-        ? Math.max(...waiting.map((entry) => entry.position))
-        : 0;
-      const returnedAt = new Date().toISOString();
       await Promise.all(
         participantIds.map((playerId, index) =>
           supabase
@@ -1733,11 +2004,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         {!isOnline ? <WifiOff size={17} /> : <Wifi size={17} />}
         <span>
           {!isOnline
-            ? `Offline · ${pendingScoreCount} score ${pendingScoreCount === 1 ? "change" : "changes"} pending`
+            ? `Offline Game Day · ${pendingChangeCount} ${pendingChangeCount === 1 ? "change" : "changes"} waiting to sync`
             : syncState === "syncing"
-              ? `Syncing ${pendingScoreCount} score ${pendingScoreCount === 1 ? "change" : "changes"}…`
+              ? `Syncing ${pendingChangeCount} ${pendingChangeCount === 1 ? "change" : "changes"}…`
               : syncState === "error"
-                ? `${pendingScoreCount} score ${pendingScoreCount === 1 ? "change" : "changes"} saved on this device`
+                ? `${pendingChangeCount} ${pendingChangeCount === 1 ? "change" : "changes"} saved on this device`
                 : "Online · Scores synced"}
         </span>
       </div>
