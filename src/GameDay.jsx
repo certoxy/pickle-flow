@@ -9,6 +9,7 @@ import {
   Download,
   Edit3,
   ExternalLink,
+  Flag,
   HelpCircle,
   Link,
   MonitorUp,
@@ -81,6 +82,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [showOfflineScanner, setShowOfflineScanner] = useState(false);
   const [showPageTour, setShowPageTour] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showEndPrompt, setShowEndPrompt] = useState(false);
+  const [endingEvent, setEndingEvent] = useState(false);
   const scoreSaveChains = useRef({});
   const directSyncs = useRef(new Map());
   const offlineSyncs = useRef(new Map());
@@ -293,6 +296,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     court.status === "available" && !playingGameForCourt(court.id);
   const isNextMatch = (game) =>
     game.status === "queued" && !game.court_id;
+  const eventEnded = event.status === "completed";
   const standings = useMemo(
     () =>
       checkedIn
@@ -307,11 +311,27 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               completedGames.find((game) => game.id === entry.game_id)
                 ?.winner_team === entry.team_number,
           ).length;
+          const accumulatedScore = appearances.reduce((total, entry) => {
+            const game = completedGames.find(
+              (completedGame) => completedGame.id === entry.game_id,
+            );
+            if (!game) return total;
+            return (
+              total +
+              Number(
+                entry.team_number === 1
+                  ? game.team_one_score || 0
+                  : game.team_two_score || 0,
+              )
+            );
+          }, 0);
           return {
             ...player,
             played: appearances.length,
             wins,
             losses: appearances.length - wins,
+            winRate: appearances.length ? (wins / appearances.length) * 100 : 0,
+            accumulatedScore,
           };
         })
         .sort(
@@ -322,9 +342,39 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         ),
     [checkedIn, completedGames, gamePlayers],
   );
+  const topWinPercentage = useMemo(
+    () =>
+      [...standings]
+        .filter((player) => player.played > 0)
+        .sort(
+          (a, b) =>
+            b.winRate - a.winRate ||
+            b.wins - a.wins ||
+            b.played - a.played ||
+            b.accumulatedScore - a.accumulatedScore ||
+            a.full_name.localeCompare(b.full_name),
+        )
+        .slice(0, 5),
+    [standings],
+  );
+  const topAccumulatedScore = useMemo(
+    () =>
+      [...standings]
+        .filter((player) => player.played > 0)
+        .sort(
+          (a, b) =>
+            b.accumulatedScore - a.accumulatedScore ||
+            b.winRate - a.winRate ||
+            b.wins - a.wins ||
+            a.full_name.localeCompare(b.full_name),
+        )
+        .slice(0, 5),
+    [standings],
+  );
 
   useEffect(() => {
     if (
+      eventEnded ||
       !event.auto_assign_next_players ||
       autoQueueing ||
       !availableCheckedInNotQueued.length
@@ -364,6 +414,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .finally(() => setAutoQueueing(false));
   }, [
     event.auto_assign_next_players,
+    eventEnded,
     event.id,
     players,
     queue,
@@ -374,6 +425,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   useEffect(() => {
     if (
+      eventEnded ||
       !event.auto_assign_next_players ||
       autoAssigning ||
       autoQueueing ||
@@ -391,6 +443,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     ).finally(() => setAutoAssigning(false));
   }, [
     event.auto_assign_next_players,
+    eventEnded,
     courts,
     queue,
     games,
@@ -400,14 +453,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   ]);
 
   useEffect(() => {
-    if (autoPlacingMatch || !unassignedQueuedGames.length) return;
+    if (eventEnded || autoPlacingMatch || !unassignedQueuedGames.length) return;
     const court = courts.find(courtCanAcceptMatch);
     if (!court) return;
     setAutoPlacingMatch(true);
     assignMatchToCourt(unassignedQueuedGames[0], court).finally(() =>
       setAutoPlacingMatch(false),
     );
-  }, [courts, games, autoPlacingMatch]);
+  }, [courts, games, autoPlacingMatch, eventEnded]);
 
   async function updateEventSettings(field, value) {
     const payload = {
@@ -795,6 +848,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   async function createMatchFor(playerIds, automatic = false) {
     setMessage("");
+    if (eventEnded) {
+      setMessage("This event has ended. New matches are disabled.");
+      return false;
+    }
     if (playerIds.length !== playersNeeded) {
       setMessage(`Select exactly ${playersNeeded} players.`);
       return false;
@@ -866,7 +923,124 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     await createMatchFor(selectedPlayers);
   }
 
+  async function endEvent() {
+    if (endingEvent) return;
+    setEndingEvent(true);
+    setMessage("");
+    const unfinishedIds = games
+      .filter((game) => ["queued", "playing"].includes(game.status))
+      .map((game) => game.id);
+    if (unfinishedIds.length) {
+      const { error: gameError } = await supabase
+        .from("games")
+        .update({ status: "cancelled" })
+        .in("id", unfinishedIds);
+      if (gameError) {
+        setMessage(`The event could not be ended: ${gameError.message}`);
+        setEndingEvent(false);
+        return;
+      }
+    }
+    await supabase
+      .from("event_courts")
+      .update({ status: "available" })
+      .eq("event_id", event.id)
+      .neq("status", "disabled");
+    const { data: updatedEvent, error } = await supabase
+      .from("events")
+      .update({ status: "completed" })
+      .eq("id", event.id)
+      .select()
+      .single();
+    if (error) {
+      setMessage(`The event could not be ended: ${error.message}`);
+      setEndingEvent(false);
+      return;
+    }
+    setGames((current) =>
+      current.map((game) =>
+        unfinishedIds.includes(game.id) ? { ...game, status: "cancelled" } : game,
+      ),
+    );
+    setCourts((current) =>
+      current.map((court) =>
+        court.status === "disabled" ? court : { ...court, status: "available" },
+      ),
+    );
+    onEventUpdated?.(updatedEvent);
+    setShowEndPrompt(false);
+    setEndingEvent(false);
+    setMessage("Event completed. Game controls are now disabled and final leaderboards are ready.");
+  }
+
+  function downloadLeaderboard(type) {
+    const isWins = type === "wins";
+    const leaders = isWins ? topWinPercentage : topAccumulatedScore;
+    const canvas = document.createElement("canvas");
+    canvas.width = 1200;
+    canvas.height = 1200;
+    const context = canvas.getContext("2d");
+    const gradient = context.createLinearGradient(0, 0, 1200, 1200);
+    gradient.addColorStop(0, "#0c3158");
+    gradient.addColorStop(0.58, "#14518a");
+    gradient.addColorStop(1, "#75a925");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 1200, 1200);
+    context.fillStyle = "rgba(255,255,255,.08)";
+    context.beginPath();
+    context.arc(1100, 80, 330, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#a9e72f";
+    context.font = "800 34px Manrope, Arial, sans-serif";
+    context.fillText("PICKLEFLOW", 80, 90);
+    context.fillStyle = "#ffffff";
+    context.font = "800 68px Manrope, Arial, sans-serif";
+    context.fillText(isWins ? "TOP 5 · WINNING %" : "TOP 5 · TOTAL SCORE", 80, 195);
+    context.fillStyle = "#dceaf6";
+    context.font = "600 31px Manrope, Arial, sans-serif";
+    const eventTitle = event.name.length > 48 ? `${event.name.slice(0, 45)}…` : event.name;
+    context.fillText(eventTitle, 80, 250);
+    context.font = "600 23px Manrope, Arial, sans-serif";
+    context.fillText("Final standings · Generated by PickleFlow", 80, 292);
+    leaders.forEach((player, index) => {
+      const y = 355 + index * 145;
+      context.fillStyle = index === 0 ? "rgba(169,231,47,.22)" : "rgba(255,255,255,.11)";
+      context.beginPath();
+      context.roundRect(70, y, 1060, 112, 24);
+      context.fill();
+      context.fillStyle = index === 0 ? "#a9e72f" : "#ffffff";
+      context.font = "800 45px Manrope, Arial, sans-serif";
+      context.fillText(String(index + 1), 105, y + 70);
+      context.fillStyle = "#ffffff";
+      context.font = "800 34px Manrope, Arial, sans-serif";
+      const name = player.full_name.length > 28 ? `${player.full_name.slice(0, 25)}…` : player.full_name;
+      context.fillText(name, 180, y + 49);
+      context.fillStyle = "#c9dbea";
+      context.font = "600 22px Manrope, Arial, sans-serif";
+      context.fillText(`${player.wins} wins · ${player.played} games · ${player.accumulatedScore} points`, 180, y + 82);
+      context.fillStyle = "#ffffff";
+      context.textAlign = "right";
+      context.font = "800 42px Manrope, Arial, sans-serif";
+      context.fillText(isWins ? `${player.winRate.toFixed(1)}%` : String(player.accumulatedScore), 1080, y + 70);
+      context.textAlign = "left";
+    });
+    if (!leaders.length) {
+      context.fillStyle = "#ffffff";
+      context.font = "700 34px Manrope, Arial, sans-serif";
+      context.fillText("Complete a game to generate the leaderboard.", 80, 430);
+    }
+    context.fillStyle = "#dceaf6";
+    context.font = "600 22px Manrope, Arial, sans-serif";
+    context.fillText("pickleflow.paotechs.com", 80, 1120);
+    const link = document.createElement("a");
+    const safeName = event.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    link.download = `${safeName || "pickleflow-event"}-${isWins ? "top-winning-percentage" : "top-total-score"}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  }
+
   async function startGame(game) {
+    if (eventEnded) return setMessage("This event has ended. Games are disabled.");
     if (
       games.some(
         (item) =>
@@ -1138,6 +1312,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   function changeLiveScore(game, team, change) {
+    if (eventEnded) return;
     const key = team === 1 ? "one" : "two";
     setScores((currentScores) => {
       const current = currentScores[game.id] || { one: 0, two: 0 };
@@ -1300,6 +1475,22 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         </div>,
         document.body,
       )}
+      {showEndPrompt && createPortal(
+        <div className="modal-backdrop viewport-top-backdrop" role="presentation" onMouseDown={() => !endingEvent && setShowEndPrompt(false)}>
+          <section className="game-complete-dialog end-event-dialog" role="dialog" aria-modal="true" aria-labelledby="end-event-title" onMouseDown={(event) => event.stopPropagation()}>
+            <span className="dialog-icon"><Flag size={25} /></span>
+            <span className="eyebrow">Finish Game Day</span>
+            <h2 id="end-event-title">End this event?</h2>
+            <p className="muted">This marks the event as completed, cancels unfinished matches, frees all active courts, and disables further game actions. Completed results and leaderboards will remain available.</p>
+            {activeGames.length > 0 && <p className="end-event-warning"><strong>{activeGames.length} unfinished {activeGames.length === 1 ? "match" : "matches"}</strong> will be cancelled.</p>}
+            <div className="dialog-actions">
+              <button className="button button-secondary" type="button" onClick={() => setShowEndPrompt(false)} disabled={endingEvent}>Keep event open</button>
+              <button className="button button-danger" type="button" onClick={endEvent} disabled={endingEvent}><Flag size={17} /> {endingEvent ? "Ending event…" : "End event"}</button>
+            </div>
+          </section>
+        </div>,
+        document.body,
+      )}
       {substitutionPrompt && (
         <div className="modal-backdrop">
           <section
@@ -1370,8 +1561,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </span>
           <h2>{event.name}</h2>
         </div>
-        <div className="game-day-title-actions"><button className="page-guide-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={17} /> Guide</button><button className="button button-secondary" data-tour="game-settings" onClick={() => setShowSettings(true)}><Settings2 size={16} /> Game Settings</button><button className="button button-secondary" data-tour="match-board" onClick={openDisplayLink}><MonitorUp size={16} /> Match Board</button><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
+        <div className="game-day-title-actions"><button className="page-guide-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={17} /> Guide</button><button className="button button-secondary" data-tour="game-settings" onClick={() => setShowSettings(true)} disabled={eventEnded}><Settings2 size={16} /> Game Settings</button><button className="button button-secondary" data-tour="match-board" onClick={openDisplayLink}><MonitorUp size={16} /> Match Board</button><button className={`button ${eventEnded ? "button-secondary" : "button-danger"}`} type="button" onClick={() => setShowEndPrompt(true)} disabled={eventEnded}><Flag size={16} /> {eventEnded ? "Event ended" : "End event"}</button><button className="button button-secondary" onClick={onBack}><ArrowLeft size={16} /> Event roster</button></div>
       </div>
+      {eventEnded && <div className="event-ended-banner"><Flag size={18} /><span><strong>Event completed</strong> Game controls are disabled. Final standings and leaderboard downloads remain available below.</span></div>}
       <div className={`score-sync-status ${!isOnline ? "offline" : syncState}`} role="status">
         {!isOnline ? <WifiOff size={17} /> : <Wifi size={17} />}
         <span>
@@ -1438,6 +1630,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 >
                   <input
                     type="checkbox"
+                    disabled={eventEnded}
                     checked={selectedPlayers.includes(
                       entry.player_registration_id,
                     )}
@@ -1463,6 +1656,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   </div>
                   <button
                     type="button"
+                    disabled={eventEnded}
                     onClick={(e) => {
                       e.preventDefault();
                       removeFromQueue(entry.player_registration_id);
@@ -1479,7 +1673,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               <button
                 className="button button-secondary"
                 onClick={selectNextPlayers}
-                disabled={waiting.length < 4}
+                disabled={eventEnded || waiting.length < 4}
               >
                 Select next four players
               </button>
@@ -1487,7 +1681,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             <button
               className="button button-primary"
               onClick={createMatch}
-              disabled={selectedPlayers.length !== playersNeeded}
+              disabled={eventEnded || selectedPlayers.length !== playersNeeded}
             >
               <Swords size={16} /> Create match ({selectedPlayers.length}/
               {playersNeeded})
@@ -1551,6 +1745,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                           <button
                             type="button"
                             onClick={() => openSubstitution(game, slot)}
+                            disabled={eventEnded}
                             aria-label={`Substitute ${playerName(players, slot.player_registration_id)}`}
                             title="Substitute player"
                           >
@@ -1575,6 +1770,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                           <button
                             type="button"
                             onClick={() => openSubstitution(game, slot)}
+                            disabled={eventEnded}
                             aria-label={`Substitute ${playerName(players, slot.player_registration_id)}`}
                             title="Substitute player"
                           >
@@ -1588,7 +1784,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   <button
                     className="button button-primary button-full"
                     onClick={() => startGame(game)}
-                    disabled={!game.court_id}
+                    disabled={eventEnded || !game.court_id}
                   >
                     <Play size={16} />
                     {!game.court_id ? "Waiting for an available court" : "Start game"}
@@ -1599,6 +1795,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                       <span>Team 1</span>
                       <div className="score-control">
                         <button
+                          disabled={eventEnded}
                           onClick={() => changeLiveScore(game, 1, -1)}
                           aria-label="Subtract Team 1 point"
                         >
@@ -1606,6 +1803,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                         </button>
                         <strong>{scores[game.id]?.one || 0}</strong>
                         <button
+                          disabled={eventEnded}
                           onClick={() => changeLiveScore(game, 1, 1)}
                           aria-label="Add Team 1 point"
                         >
@@ -1618,6 +1816,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                       <span>Team 2</span>
                       <div className="score-control">
                         <button
+                          disabled={eventEnded}
                           onClick={() => changeLiveScore(game, 2, -1)}
                           aria-label="Subtract Team 2 point"
                         >
@@ -1625,6 +1824,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                         </button>
                         <strong>{scores[game.id]?.two || 0}</strong>
                         <button
+                          disabled={eventEnded}
                           onClick={() => changeLiveScore(game, 2, 1)}
                           aria-label="Add Team 2 point"
                         >
@@ -1854,6 +2054,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   <th>Played</th>
                   <th>Wins</th>
                   <th>Losses</th>
+                  <th>Win %</th>
+                  <th>Total score</th>
                 </tr>
               </thead>
               <tbody>
@@ -1866,6 +2068,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                     <td>{player.played}</td>
                     <td>{player.wins}</td>
                     <td>{player.losses}</td>
+                    <td>{player.played ? `${player.winRate.toFixed(1)}%` : "—"}</td>
+                    <td><strong>{player.accumulatedScore}</strong></td>
                   </tr>
                 ))}
               </tbody>
@@ -1899,6 +2103,21 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </div>
         </section>
       </div>
+      <section className="leaderboard-section">
+        <div className="leaderboard-heading"><div><span className="eyebrow"><Trophy size={15} /> Player highlights</span><h2>Top 5 leaderboards</h2></div><p>Updated from completed game results.</p></div>
+        <div className="leaderboard-grid">
+          <article className="leaderboard-card winning">
+            <header><div><span>Top performers</span><h3>Winning percentage</h3></div><button className="button button-secondary" type="button" onClick={() => downloadLeaderboard("wins")} disabled={!topWinPercentage.length}><Download size={16} /> Image</button></header>
+            <ol>{topWinPercentage.map((player) => <li key={player.id}><b>{player.full_name}</b><span>{player.wins} wins · {player.played} games</span><strong>{player.winRate.toFixed(1)}%</strong></li>)}</ol>
+            {!topWinPercentage.length && <p className="muted">Complete a game to see the leaders.</p>}
+          </article>
+          <article className="leaderboard-card scoring">
+            <header><div><span>Point leaders</span><h3>Total accumulated score</h3></div><button className="button button-secondary" type="button" onClick={() => downloadLeaderboard("scores")} disabled={!topAccumulatedScore.length}><Download size={16} /> Image</button></header>
+            <ol>{topAccumulatedScore.map((player) => <li key={player.id}><b>{player.full_name}</b><span>{player.wins} wins · {player.played} games</span><strong>{player.accumulatedScore}</strong></li>)}</ol>
+            {!topAccumulatedScore.length && <p className="muted">Complete a game to see the leaders.</p>}
+          </article>
+        </div>
+      </section>
       </div>
     </section>
   );

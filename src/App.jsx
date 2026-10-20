@@ -1851,8 +1851,8 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           <h2>{event.name}</h2>
         </div>
         <div className="title-actions"><button className="page-guide-button" type="button" onClick={() => setShowPageTour(true)}><HelpCircle size={17} /> Guide</button>
-          <button className="button button-primary" data-tour="open-game-day" onClick={onGameDay}>
-            Open game day
+          <button className="button button-primary" data-tour="open-game-day" onClick={onGameDay} disabled={event.status === "completed"} title={event.status === "completed" ? "This event has ended" : "Open Game Day"}>
+            {event.status === "completed" ? "Event ended" : "Open game day"}
           </button>
           <button className="button button-secondary" onClick={onBack}>
             Back to events
