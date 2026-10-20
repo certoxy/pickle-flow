@@ -3158,6 +3158,17 @@ select:focus-visible {
 .leaderboard-heading h2 { margin: 6px 0 0; color: var(--navy); font-size: 1.35rem; }
 .leaderboard-heading > p { margin: 0; color: var(--muted); font-size: .8rem; }
 .leaderboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.overall-champion-card { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; overflow: hidden; padding: 22px 24px; border: 1px solid #d9bf54; border-radius: 20px; color: #fff; background: linear-gradient(125deg, #0d345d, #164f82 62%, #617f19); box-shadow: 0 16px 36px rgba(18,59,102,.16); }
+.overall-champion-card::after { content: ""; position: absolute; top: -85px; right: 12%; width: 210px; height: 210px; border-radius: 50%; background: rgba(255,216,77,.11); }
+.overall-champion-card.tied { background: linear-gradient(125deg, #253c63, #5c477a 60%, #6f7c26); }
+.champion-crown { position: relative; z-index: 1; display: grid; place-items: center; width: 62px; height: 62px; border-radius: 18px; color: #604b00; background: linear-gradient(145deg, #ffe989, #ffd138); transform: rotate(-4deg); }
+.champion-crown svg { width: 32px; height: 32px; transform: rotate(4deg); }
+.champion-copy { position: relative; z-index: 1; min-width: 0; }
+.champion-copy > span { color: #dfffa9; font-size: .72rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.champion-copy h3 { margin: 5px 0 5px; overflow: hidden; color: #fff; font-size: clamp(1.35rem, 2.2vw, 1.9rem); text-overflow: ellipsis; }
+.champion-copy p { margin: 0; color: #e5eff7; font-size: .86rem; }
+.champion-copy small { display: block; margin-top: 7px; color: #bfcfdb; font-size: .68rem; line-height: 1.45; }
+.champion-download { position: relative; z-index: 1; color: #443600; background: var(--yellow); }
 .leaderboard-card { overflow: hidden; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: linear-gradient(145deg, #fff, #f5f9fc); box-shadow: 0 12px 30px rgba(18,59,102,.07); }
 .leaderboard-card.winning { border-top: 4px solid var(--green); }
 .leaderboard-card.scoring { border-top: 4px solid var(--blue); }
@@ -3178,6 +3189,8 @@ select:focus-visible {
   .leaderboard-heading { align-items: flex-start; flex-direction: column; gap: 4px; }
   .leaderboard-card { padding: 16px; }
   .leaderboard-card > header { align-items: flex-start; }
+  .overall-champion-card { grid-template-columns: auto minmax(0, 1fr); padding: 19px; }
+  .overall-champion-card .champion-download { grid-column: 1 / -1; width: 100%; }
   .event-ended-banner { align-items: flex-start; }
 }
 
