@@ -1,5 +1,6 @@
 const OUTBOX_KEY = "pickleflow-game-day-outbox-v1";
 const CACHE_PREFIX = "pickleflow-game-day-cache-v1:";
+const DEVICE_KEY = "pickleflow-organizer-device-v1";
 
 function readJson(key, fallback) {
   try {
@@ -18,6 +19,16 @@ function writeJson(key, value) {
   }
 }
 
+export function getOrganizerDeviceId() {
+  if (typeof window === "undefined") return "server";
+  let deviceId = window.localStorage.getItem(DEVICE_KEY);
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    window.localStorage.setItem(DEVICE_KEY, deviceId);
+  }
+  return deviceId;
+}
+
 export function pendingGameDayOperations(eventId) {
   if (typeof window === "undefined") return [];
   return readJson(OUTBOX_KEY, []).filter((item) => item.eventId === eventId);
@@ -29,6 +40,7 @@ export function enqueueGameDayOperation(eventId, type, payload) {
     eventId,
     type,
     payload,
+    deviceId: getOrganizerDeviceId(),
     createdAt: new Date().toISOString(),
   };
   const outbox = readJson(OUTBOX_KEY, []);
