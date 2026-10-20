@@ -706,6 +706,22 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   async function checkInPlayer(player) {
     if (player.checked_in_at) return;
     const checked_in_at = new Date().toISOString();
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "check_in_player", {
+        playerId: player.id,
+        checkedInAt: checked_in_at,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setPlayers((current) =>
+        current.map((item) =>
+          item.id === player.id ? { ...item, checked_in_at } : item,
+        ),
+      );
+      const queued = await addToQueue(player.id);
+      if (queued)
+        setMessage(`Offline · ${player.full_name} checked in and joined the queue.`);
+      return;
+    }
     const { error } = await supabase
       .from("player_registrations")
       .update({ checked_in_at })
@@ -723,6 +739,20 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   async function markPlayerOut(player) {
     if (!player.checked_in_at || activePlayerIds.has(player.id)) return;
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "mark_player_out", {
+        playerId: player.id,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      await removeFromQueue(player.id);
+      setPlayers((current) =>
+        current.map((item) =>
+          item.id === player.id ? { ...item, checked_in_at: null } : item,
+        ),
+      );
+      setMessage(`Offline · ${player.full_name} is marked out for this event.`);
+      return;
+    }
     const { error } = await supabase
       .from("player_registrations")
       .update({ checked_in_at: null })
@@ -953,6 +983,23 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         ? Math.min(...waiting.map((item) => item.position)) - 1
         : Math.max(...waiting.map((item) => item.position)) + 1
       : 1;
+    const queueEntry = {
+      id: crypto.randomUUID(),
+      event_id: event.id,
+      player_registration_id: playerId,
+      position,
+      status: "waiting",
+      joined_at: new Date().toISOString(),
+    };
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "upsert_queue", { queueEntry });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setQueue((current) => [
+        ...current.filter((item) => item.player_registration_id !== playerId),
+        queueEntry,
+      ]);
+      return true;
+    }
     const { data, error } = await supabase
       .from("game_queue")
       .upsert(
@@ -984,7 +1031,36 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     if (addingPlayer || !newPlayer.full_name.trim()) return;
     setAddingPlayer(true);
     setMessage("");
+    const normalizedName = newPlayer.full_name.trim().toLocaleLowerCase();
+    if (players.some((player) => player.full_name.trim().toLocaleLowerCase() === normalizedName)) {
+      setMessage("A player with this name is already registered for this event.");
+      setAddingPlayer(false);
+      return;
+    }
     const checked_in_at = new Date().toISOString();
+    if (!navigator.onLine) {
+      const player = {
+        id: crypto.randomUUID(),
+        event_id: event.id,
+        full_name: newPlayer.full_name.trim(),
+        skill_level: newPlayer.skill_level,
+        email: null,
+        phone: null,
+        status: "confirmed",
+        checked_in_at,
+        created_at: checked_in_at,
+      };
+      enqueueGameDayOperation(event.id, "add_player", { player });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setPlayers((current) => [...current, player]);
+      const queued = await addToQueue(player.id);
+      if (queued) {
+        setNewPlayer({ full_name: "", skill_level: "beginner" });
+        setMessage(`Offline · ${player.full_name} added, checked in, and joined the queue.`);
+      }
+      setAddingPlayer(false);
+      return;
+    }
     const { data, error } = await supabase
       .from("player_registrations")
       .insert({
@@ -1024,6 +1100,19 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       (item) => item.player_registration_id === playerId,
     );
     if (!existing) return;
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "remove_queue", {
+        queueId: existing.id,
+        playerId,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setQueue((current) =>
+        current.map((item) =>
+          item.id === existing.id ? { ...item, status: "removed" } : item,
+        ),
+      );
+      return;
+    }
     const { error } = await supabase
       .from("game_queue")
       .update({ status: "removed" })
@@ -1517,7 +1606,33 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     for (const operation of operations) {
       const { type, payload } = operation;
       let error = null;
-      if (type === "create_match") {
+      if (type === "add_player") {
+        ({ error } = await supabase
+          .from("player_registrations")
+          .upsert(payload.player));
+      } else if (type === "check_in_player") {
+        ({ error } = await supabase
+          .from("player_registrations")
+          .update({ checked_in_at: payload.checkedInAt })
+          .eq("id", payload.playerId));
+      } else if (type === "mark_player_out") {
+        ({ error } = await supabase
+          .from("player_registrations")
+          .update({ checked_in_at: null })
+          .eq("id", payload.playerId));
+      } else if (type === "upsert_queue") {
+        ({ error } = await supabase
+          .from("game_queue")
+          .upsert(payload.queueEntry, {
+            onConflict: "event_id,player_registration_id",
+          }));
+      } else if (type === "remove_queue") {
+        ({ error } = await supabase
+          .from("game_queue")
+          .update({ status: "removed" })
+          .eq("event_id", event.id)
+          .eq("player_registration_id", payload.playerId));
+      } else if (type === "create_match") {
         ({ error } = await supabase.from("games").upsert(payload.game));
         if (!error)
           ({ error } = await supabase
