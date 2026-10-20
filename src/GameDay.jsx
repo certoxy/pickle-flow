@@ -49,6 +49,40 @@ import {
 const playerName = (players, id) =>
   players.find((player) => player.id === id)?.full_name || "Unknown player";
 
+function normalizeCourtAssignments(gameList) {
+  const unassignIds = [];
+  const courtIds = [
+    ...new Set(
+      gameList
+        .filter(
+          (game) =>
+            game.court_id && ["queued", "playing"].includes(game.status),
+        )
+        .map((game) => game.court_id),
+    ),
+  ];
+  courtIds.forEach((courtId) => {
+    const assigned = gameList
+      .filter(
+        (game) =>
+          game.court_id === courtId &&
+          ["queued", "playing"].includes(game.status),
+      )
+      .sort(
+        (a, b) =>
+          (a.status === b.status ? 0 : a.status === "playing" ? -1 : 1) ||
+          a.game_number - b.game_number,
+      );
+    assigned.slice(1).forEach((game) => unassignIds.push(game.id));
+  });
+  return {
+    games: gameList.map((game) =>
+      unassignIds.includes(game.id) ? { ...game, court_id: null } : game,
+    ),
+    unassignIds,
+  };
+}
+
 export default function GameDay({ event, onBack, onEventUpdated }) {
   const [players, setPlayers] = useState([]);
   const [courts, setCourts] = useState([]);
@@ -112,10 +146,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     if (!navigator.onLine) {
       const cached = getCachedGameDayState(event.id);
       if (cached) {
+        const normalized = normalizeCourtAssignments(cached.games || []);
         setPlayers(cached.players || []);
         setCourts(cached.courts || []);
         setQueue(cached.queue || []);
-        setGames(cached.games || []);
+        setGames(normalized.games);
         setGamePlayers(cached.gamePlayers || []);
         setScores(cached.scores || {});
         setPendingScoreCount(pendingScoresForEvent(event.id).length);
@@ -152,7 +187,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           .eq("event_id", event.id)
           .order("game_number", { ascending: false }),
       ]);
-    const loadedGames = gameResult.data || [];
+    const normalized = normalizeCourtAssignments(gameResult.data || []);
+    const loadedGames = normalized.games;
+    if (normalized.unassignIds.length)
+      await supabase
+        .from("games")
+        .update({ court_id: null })
+        .in("id", normalized.unassignIds);
     const gameIds = loadedGames.map((game) => game.id);
     const participantResult = gameIds.length
       ? await supabase.from("game_players").select("*").in("game_id", gameIds)
@@ -338,7 +379,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     .filter((game) => game.status === "queued" && !game.court_id)
     .sort((a, b) => a.game_number - b.game_number);
   const courtCanAcceptMatch = (court) =>
-    court.status === "available" && !playingGameForCourt(court.id);
+    court.status === "available" &&
+    !activeGames.some((game) => game.court_id === court.id);
   const isNextMatch = (game) =>
     game.status === "queued" && !game.court_id;
   const eventEnded = event.status === "completed";
@@ -1009,6 +1051,16 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   async function assignMatchToCourt(game, court) {
+    if (
+      activeGames.some(
+        (item) => item.id !== game.id && item.court_id === court.id,
+      )
+    ) {
+      setMessage(
+        `${court.name} already has an active match. This game will remain court-pending.`,
+      );
+      return false;
+    }
     if (!navigator.onLine) {
       enqueueGameDayOperation(event.id, "assign_match", {
         gameId: game.id,
