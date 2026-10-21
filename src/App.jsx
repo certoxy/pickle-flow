@@ -54,6 +54,7 @@ const emptyEvent = {
   city: "",
   event_date: "",
   start_time: "",
+  play_end_time: "",
   registration_limit: 32,
   organizer_contact_phone: "",
   location_lat: null,
@@ -1446,6 +1447,7 @@ function EventForm({
             ...emptyEvent,
             ...initialEvent,
             start_time: initialEvent.start_time?.slice(0, 5) || "",
+            play_end_time: initialEvent.play_end_time?.slice(0, 5) || "",
           }
         : { ...emptyEvent, city: defaultCity || "", organizer_contact_phone: organizerPhone || "" },
     ),
@@ -1456,6 +1458,11 @@ function EventForm({
     e.preventDefault();
     setBusy(true);
     setMessage("");
+    if (form.start_time && form.play_end_time && form.play_end_time <= form.start_time) {
+      setMessage("Play end time must be later than play start time.");
+      setBusy(false);
+      return;
+    }
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -1466,6 +1473,7 @@ function EventForm({
       city: form.city,
       event_date: form.event_date,
       start_time: form.start_time || null,
+      play_end_time: form.play_end_time || null,
       registration_limit: form.registration_limit
         ? Number(form.registration_limit)
         : null,
@@ -1613,13 +1621,25 @@ function EventForm({
             />
           </label>
           <label>
-            Start time
+            Play start time
             <input
               type="time"
               name="start_time"
               value={form.start_time}
+              required
               onChange={update}
             />
+          </label>
+          <label>
+            Play end time
+            <input
+              type="time"
+              name="play_end_time"
+              value={form.play_end_time}
+              onChange={update}
+              required
+            />
+            <small>Final equalization begins 30 minutes before this time.</small>
           </label>
         </div>
         {editing && (
