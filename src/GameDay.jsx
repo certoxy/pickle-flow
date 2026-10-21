@@ -49,6 +49,20 @@ import {
 const playerName = (players, id) =>
   players.find((player) => player.id === id)?.full_name || "Unknown player";
 
+const SKILL_RATINGS = {
+  novice: 1,
+  beginner: 2,
+  intermediate: 3,
+  advanced: 4,
+  competitive: 5,
+};
+
+const SKILL_MODE_LABELS = {
+  balanced: "Balanced Matches",
+  similar_skill: "Similar Skill",
+  mix_everyone: "Mix Everyone",
+};
+
 function normalizeCourtAssignments(gameList) {
   const unassignIds = [];
   const courtIds = [
@@ -539,6 +553,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     return partnerCounts.get([first, second].sort().join(":")) || 0;
   }
 
+  const skillMatchingMode = event.skill_matching_mode || "balanced";
+
+  function playerSkillRating(playerId) {
+    const skill = players.find((player) => player.id === playerId)?.skill_level;
+    return SKILL_RATINGS[skill] || SKILL_RATINGS.beginner;
+  }
+
   function arrangeOpenPlayPartners(playerIds) {
     if (event.game_format !== "open_play" || playerIds.length !== 4)
       return playerIds;
@@ -548,32 +569,49 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       [a, c, b, d],
       [a, d, b, c],
     ];
-    return options.sort(
-      (first, second) =>
-        partnershipCount(first[0], first[1]) +
-        partnershipCount(first[2], first[3]) -
-        partnershipCount(second[0], second[1]) -
-        partnershipCount(second[2], second[3]),
-    )[0];
+    return options
+      .map((ids) => {
+        const repeatedPartners =
+          partnershipCount(ids[0], ids[1]) +
+          partnershipCount(ids[2], ids[3]);
+        const teamOneSkill =
+          playerSkillRating(ids[0]) + playerSkillRating(ids[1]);
+        const teamTwoSkill =
+          playerSkillRating(ids[2]) + playerSkillRating(ids[3]);
+        const teamSkillGap = Math.abs(teamOneSkill - teamTwoSkill);
+        const score =
+          skillMatchingMode === "mix_everyone"
+            ? repeatedPartners * 1_000_000 + teamSkillGap
+            : teamSkillGap * 1_000_000 + repeatedPartners;
+        return { ids, score };
+      })
+      .sort((first, second) => first.score - second.score)[0].ids;
   }
 
   function fairNextPlayerIds() {
+    const now = Date.now();
     const ranked = waiting
       .map((entry, queueIndex) => ({
         id: entry.player_registration_id,
         gamesPlayed: playerGameCounts.get(entry.player_registration_id) || 0,
         queueIndex,
+        waitedLong:
+          now - new Date(entry.joined_at || now).getTime() >= 15 * 60 * 1000,
+        skill: playerSkillRating(entry.player_registration_id),
       }))
       .sort(
         (a, b) =>
-          a.gamesPlayed - b.gamesPlayed || a.queueIndex - b.queueIndex,
+          a.gamesPlayed - b.gamesPlayed ||
+          Number(b.waitedLong) - Number(a.waitedLong) ||
+          a.queueIndex - b.queueIndex,
       );
     if (ranked.length < playersNeeded) return [];
     if (event.game_format !== "open_play" || playersNeeded !== 4)
       return ranked.slice(0, playersNeeded).map((player) => player.id);
 
-    // Search a fair-sized front pool. Games played is weighted first, then
-    // repeat partnerships, then queue order.
+    // Games played always has priority. Within a fair front pool, the selected
+    // mode controls how strongly skill compatibility affects the next group.
+    // A player waiting at least 15 minutes receives queue priority protection.
     const pool = ranked.slice(0, Math.min(20, ranked.length));
     let best = null;
     for (let a = 0; a < pool.length - 3; a += 1)
@@ -584,9 +622,6 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             const arranged = arrangeOpenPlayPartners(
               group.map((player) => player.id),
             );
-            const repeatedPartners =
-              partnershipCount(arranged[0], arranged[1]) +
-              partnershipCount(arranged[2], arranged[3]);
             const gamesPlayed = group.reduce(
               (total, player) => total + player.gamesPlayed,
               0,
@@ -595,7 +630,21 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               (total, player) => total + player.queueIndex,
               0,
             );
-            const score = gamesPlayed * 1_000_000 + repeatedPartners * 10_000 + queueCost;
+            const skills = group.map((player) => player.skill);
+            const skillSpread = Math.max(...skills) - Math.min(...skills);
+            const repeatedPartners =
+              partnershipCount(arranged[0], arranged[1]) +
+              partnershipCount(arranged[2], arranged[3]);
+            const modeCost =
+              skillMatchingMode === "similar_skill"
+                ? skillSpread * 1_000_000 + queueCost * 10_000
+                : skillMatchingMode === "balanced"
+                  ? queueCost * 1_000_000 + skillSpread * 10_000
+                  : queueCost * 1_000_000;
+            const score =
+              gamesPlayed * 1_000_000_000_000 +
+              modeCost +
+              repeatedPartners;
             if (!best || score < best.score) best = { score, ids: arranged };
           }
     return best?.ids || ranked.slice(0, 4).map((player) => player.id);
@@ -693,6 +742,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     const payload = {
       [field]: field === "points_to_win" ? Number(value) : value,
     };
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "update_event_settings", { payload });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      onEventUpdated({ ...event, ...payload });
+      setMessage(
+        `Offline · ${field === "skill_matching_mode" ? `Skill Matching changed to ${SKILL_MODE_LABELS[value] || value}` : "Game setting updated"}. This applies to newly created matches and will sync when internet returns.`,
+      );
+      return;
+    }
     const { data, error } = await supabase
       .from("events")
       .update(payload)
@@ -700,7 +758,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .select()
       .single();
     if (error) setMessage(error.message);
-    else onEventUpdated(data);
+    else {
+      onEventUpdated(data);
+      if (field === "skill_matching_mode")
+        setMessage(
+          `Skill Matching changed to ${SKILL_MODE_LABELS[value] || value}. This applies to newly created matches.`,
+        );
+    }
   }
 
   async function checkInPlayer(player) {
@@ -1606,7 +1670,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     for (const operation of operations) {
       const { type, payload } = operation;
       let error = null;
-      if (type === "add_player") {
+      if (type === "update_event_settings") {
+        ({ error } = await supabase
+          .from("events")
+          .update(payload.payload)
+          .eq("id", event.id));
+      } else if (type === "add_player") {
         ({ error } = await supabase
           .from("player_registrations")
           .upsert(payload.player));
@@ -2478,6 +2547,25 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 />
               </label>
             </div>
+            {event.game_format === "open_play" && (
+              <label className="skill-matching-setting">
+                Skill Matching Mode
+                <select
+                  value={skillMatchingMode}
+                  onChange={(e) =>
+                    updateEventSettings("skill_matching_mode", e.target.value)
+                  }
+                >
+                  <option value="balanced">Balanced Matches</option>
+                  <option value="similar_skill">Similar Skill</option>
+                  <option value="mix_everyone">Mix Everyone</option>
+                </select>
+                <small>
+                  Balanced Matches is the default. Changes apply only to matches
+                  created after switching; playing and court-pending matches stay unchanged.
+                </small>
+              </label>
+            )}
             <label className="auto-assign-toggle" data-tour="auto-assign">
               <input
                 type="checkbox"
@@ -2499,10 +2587,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             </label>
             {event.game_format === "open_play" && (
               <div className="open-play-note">
-                <strong>Four on, four off</strong>
+                <strong>Four on, four off · {SKILL_MODE_LABELS[skillMatchingMode]}</strong>
                 <span>
-                  The next four waiting players take the court. After the
-                  result, all four return to the back of the queue.
+                  The next four eligible waiting players take the court. After
+                  the result, all four return to the back of the queue.
                 </span>
               </div>
             )}
