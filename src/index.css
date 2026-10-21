@@ -3460,3 +3460,75 @@ select:focus-visible {
     font-size: 0.85rem;
   }
 }
+
+
+/* GEO content guides */
+.seo-hero > figure { margin: 0; }
+.seo-hero > figure img {
+  display: block;
+  width: 100%;
+  border: 1px solid #dce8e7;
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(16, 51, 60, .14);
+}
+.seo-hero figcaption {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.45;
+}
+.seo-updated { display: block; margin-top: 18px; color: var(--muted); }
+.seo-definition,
+.seo-limitations {
+  margin: 26px 0 54px;
+  padding: clamp(24px, 4vw, 38px);
+  border: 1px solid #cfe1df;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #f7fbfa, #eef7f6);
+}
+.seo-definition strong { color: var(--blue); font-size: .82rem; letter-spacing: .08em; text-transform: uppercase; }
+.seo-definition p,
+.seo-limitations p { margin: 10px 0 0; color: #355967; font-size: 1.05rem; line-height: 1.75; }
+.seo-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 30px 0 72px;
+}
+.seo-content article {
+  padding: clamp(24px, 4vw, 36px);
+  border: 1px solid #dce8e7;
+  border-radius: 22px;
+  background: #fff;
+}
+.seo-content h2,
+.seo-limitations h2,
+.seo-faq h2,
+.seo-related h2 { margin: 8px 0 12px; color: var(--navy); font-size: clamp(1.45rem, 2.5vw, 2rem); line-height: 1.2; }
+.seo-content p,
+.seo-content li { color: var(--muted); line-height: 1.75; }
+.seo-content ul { padding-left: 22px; }
+.seo-limitations { border-color: #f2d49e; background: #fffaf0; }
+.seo-faq { margin: 70px 0; }
+.seo-faq > div { display: grid; gap: 10px; margin-top: 24px; }
+.seo-faq details { border: 1px solid #dce8e7; border-radius: 16px; background: #fff; }
+.seo-faq summary { padding: 18px 20px; color: var(--navy); cursor: pointer; font-weight: 800; }
+.seo-faq details p { margin: 0; padding: 0 20px 20px; color: var(--muted); line-height: 1.7; }
+.seo-related { margin: 64px 0; }
+.seo-related > div { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.seo-related a {
+  padding: 12px 16px;
+  border: 1px solid #cfe1df;
+  border-radius: 999px;
+  color: var(--navy);
+  background: #fff;
+  font-weight: 800;
+  text-decoration: none;
+}
+.seo-related a:hover { border-color: var(--blue); color: var(--blue); }
+@media (max-width: 760px) {
+  .seo-content { grid-template-columns: 1fr; margin-bottom: 50px; }
+  .seo-hero > figure { order: -1; }
+  .seo-related > div { display: grid; }
+  .seo-related a { border-radius: 14px; }
+}
