@@ -61,6 +61,7 @@ const emptyEvent = {
   status: "open",
   game_format: "open_play",
   points_to_win: 11,
+  skill_matching_mode: "balanced",
   auto_assign_next_players: true,
 };
 const emptyPlayer = {
@@ -1474,6 +1475,7 @@ function EventForm({
       status: form.status,
       game_format: form.game_format,
       points_to_win: Number(form.points_to_win),
+      skill_matching_mode: form.skill_matching_mode || "balanced",
       auto_assign_next_players: Boolean(form.auto_assign_next_players),
     };
     if (!editing)
@@ -1578,6 +1580,17 @@ function EventForm({
               <input required type="number" min="1" max="99" name="points_to_win" value={form.points_to_win || 11} onChange={update} />
             </label>
           </div>
+          {form.game_format === "open_play" && (
+            <label>
+              Skill Matching Mode
+              <select name="skill_matching_mode" value={form.skill_matching_mode || "balanced"} onChange={update}>
+                <option value="balanced">Balanced Matches</option>
+                <option value="similar_skill">Similar Skill</option>
+                <option value="mix_everyone">Mix Everyone</option>
+              </select>
+              <small>Balanced Matches is recommended. You can switch modes during Game Day.</small>
+            </label>
+          )}
           <label className="event-auto-assign">
             <input type="checkbox" checked={Boolean(form.auto_assign_next_players)} onChange={(event) => setForm({ ...form, auto_assign_next_players: event.target.checked })} />
             <span><strong>Automatically prepare the next match</strong><small>PickleFlow selects the next available players from the waiting queue.</small></span>
