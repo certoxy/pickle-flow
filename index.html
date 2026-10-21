@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#123b66" />
-    <meta name="description" content="Free pickleball event and open play management for player registration, fair queues, court assignments, live scoring, and smart TV match boards." />
+    <meta name="description" content="Pickleball open play management with fair player rotation, multi-court assignments, live scoring, standings, and temporary offline Game Day support." />
     <link rel="canonical" href="https://pickleflow.paotechs.com/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="PickleFlow" />
     <meta property="og:url" content="https://pickleflow.paotechs.com/" />
-    <meta property="og:title" content="PickleFlow — From signup to final score" />
-    <meta property="og:description" content="One simple flow for registration, player queues, live scoring, and Match Board. Free for pickleball organizers." />
+    <meta property="og:title" content="PickleFlow — Open Play Management, Fair Rotation & Live Scoring" />
+    <meta property="og:description" content="Manage fair player rotations, multiple courts, live scoring, standings, and temporary offline Game Day operations." />
     <meta property="og:image" content="https://pickleflow.paotechs.com/social/pickleflow-social-card-v2.jpg" />
     <meta property="og:image:secure_url" content="https://pickleflow.paotechs.com/social/pickleflow-social-card-v2.jpg" />
     <meta property="og:image:type" content="image/jpeg" />
@@ -18,8 +18,8 @@
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content="PickleFlow — From signup to final score" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="PickleFlow — From signup to final score" />
-    <meta name="twitter:description" content="One simple flow for registration, player queues, live scoring, and Match Board. Free for pickleball organizers." />
+    <meta name="twitter:title" content="PickleFlow — Open Play Management, Fair Rotation & Live Scoring" />
+    <meta name="twitter:description" content="Manage fair player rotations, multiple courts, live scoring, standings, and temporary offline Game Day operations." />
     <meta name="twitter:image" content="https://pickleflow.paotechs.com/social/pickleflow-social-card-v2.jpg" />
     <meta name="twitter:image:alt" content="PickleFlow — From signup to final score" />
     <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png" />
@@ -30,20 +30,26 @@
         "@context": "https://schema.org",
         "@graph": [
           {
+            "@type": "Organization",
+            "@id": "https://paotechs.com/#organization",
+            "name": "PAOTECHS",
+            "url": "https://paotechs.com/"
+          },
+          {
             "@type": "WebSite",
             "@id": "https://pickleflow.paotechs.com/#website",
             "url": "https://pickleflow.paotechs.com/",
             "name": "PickleFlow",
-            "description": "Free pickleball event and open play management software."
+            "description": "Pickleball open play and event management software."
           },
           {
             "@type": "SoftwareApplication",
-            "@id": "https://pickleflow.paotechs.com/#app",
+            "@id": "https://pickleflow.paotechs.com/#software",
             "name": "PickleFlow",
             "url": "https://pickleflow.paotechs.com/",
             "applicationCategory": "SportsApplication",
-            "operatingSystem": "Web, Android, iOS",
-            "description": "Manage pickleball event registration, open play queues, court assignments, live scoring, and smart TV match boards.",
+            "operatingSystem": "Web",
+            "description": "Web-based pickleball event management software for open play, player rotation, court assignments, scoring and standings.",
             "image": "https://pickleflow.paotechs.com/social/pickleflow-social-card-v2.jpg",
             "offers": {
               "@type": "Offer",
@@ -51,15 +57,13 @@
               "priceCurrency": "USD"
             },
             "publisher": {
-              "@type": "Organization",
-              "name": "PAOTECHS",
-              "url": "https://paotechs.com/"
+              "@id": "https://paotechs.com/#organization"
             }
           }
         ]
       }
     </script>
-    <title>PickleFlow | Free Pickleball Event &amp; Open Play Management</title>
+    <title>PickleFlow | Open Play Management, Fair Rotation &amp; Live Scoring</title>
   </head>
   <body>
     <div id="root"></div>
