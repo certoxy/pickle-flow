@@ -143,6 +143,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showEndPrompt, setShowEndPrompt] = useState(false);
   const [endingEvent, setEndingEvent] = useState(false);
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  const equalizationSnapshotRequested = useRef(false);
+  const rankingsLockRequested = useRef(false);
   const scoreSaveChains = useRef({});
   const directSyncs = useRef(new Map());
   const offlineSyncs = useRef(new Map());
@@ -398,6 +401,24 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const isNextMatch = (game) =>
     game.status === "queued" && !game.court_id;
   const eventEnded = event.status === "completed";
+  const playEndAt = useMemo(() => {
+    if (!event.event_date || !event.play_end_time) return null;
+    const value = new Date(`${event.event_date}T${String(event.play_end_time).slice(0, 5)}:00`);
+    return Number.isNaN(value.getTime()) ? null : value;
+  }, [event.event_date, event.play_end_time]);
+  const equalizationStartsAt = playEndAt
+    ? new Date(playEndAt.getTime() - 30 * 60 * 1000)
+    : null;
+  const equalizationActive =
+    event.game_format === "open_play" &&
+    Boolean(equalizationStartsAt) &&
+    clockNow >= equalizationStartsAt.getTime();
+  const officialGamesTarget = Number(event.official_games_target || 0);
+  const officialRosterIds = Array.isArray(event.equalization_roster)
+    ? event.equalization_roster
+    : [];
+  const officialRoster = new Set(officialRosterIds);
+  const officialPlayLocked = Boolean(event.rankings_locked_at);
   const pendingChangeCount = pendingScoreCount + pendingOperationCount;
   const standings = useMemo(
     () =>
@@ -406,6 +427,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           const appearances = gamePlayers.filter(
             (entry) =>
               entry.player_registration_id === player.id &&
+              entry.counts_toward_standings !== false &&
               completedGames.some((game) => game.id === entry.game_id),
           );
           const wins = appearances.filter(
@@ -491,9 +513,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   );
   const championship = useMemo(() => {
     const maxGames = Math.max(0, ...standings.map((player) => player.played));
-    const minimumGames = Math.max(1, maxGames - 1);
+    const minimumGames = officialGamesTarget || Math.max(1, maxGames - 1);
     const eligible = standings
-      .filter((player) => player.played >= minimumGames)
+      .filter(
+        (player) =>
+          player.played >= minimumGames &&
+          (!officialGamesTarget || officialRoster.has(player.id)),
+      )
       .sort(
         (a, b) =>
           b.winRate - a.winRate ||
@@ -515,7 +541,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         )
       : [];
     return { champions, minimumGames, maxGames };
-  }, [standings]);
+  }, [standings, officialGamesTarget, event.equalization_roster]);
   const completedGameIds = useMemo(
     () => new Set(completedGames.map((game) => game.id)),
     [completedGames],
@@ -523,7 +549,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const playerGameCounts = useMemo(() => {
     const counts = new Map();
     gamePlayers.forEach((entry) => {
-      if (!completedGameIds.has(entry.game_id)) return;
+      if (!completedGameIds.has(entry.game_id) || entry.counts_toward_standings === false) return;
       counts.set(
         entry.player_registration_id,
         (counts.get(entry.player_registration_id) || 0) + 1,
@@ -531,6 +557,127 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     });
     return counts;
   }, [completedGameIds, gamePlayers]);
+  const officialEffectiveCounts = useMemo(() => {
+    const counts = new Map(playerGameCounts);
+    gamePlayers.forEach((entry) => {
+      if (entry.counts_toward_standings === false) return;
+      if (!activeGames.some((game) => game.id === entry.game_id)) return;
+      counts.set(
+        entry.player_registration_id,
+        (counts.get(entry.player_registration_id) || 0) + 1,
+      );
+    });
+    return counts;
+  }, [activeGames, gamePlayers, playerGameCounts]);
+  const remainingOfficialIds = officialGamesTarget
+    ? officialRosterIds.filter(
+        (playerId) =>
+          (officialEffectiveCounts.get(playerId) || 0) < officialGamesTarget,
+      )
+    : [];
+  const remainingOfficialSet = new Set(remainingOfficialIds);
+  const remainingWaitingIds = waiting
+    .map((entry) => entry.player_registration_id)
+    .filter((playerId) => remainingOfficialSet.has(playerId));
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !equalizationActive ||
+      event.equalization_started_at ||
+      equalizationSnapshotRequested.current ||
+      !checkedIn.length
+    )
+      return;
+    equalizationSnapshotRequested.current = true;
+    const roster = checkedIn.map((player) => player.id);
+    const target = Math.max(
+      1,
+      ...roster.map((playerId) => officialEffectiveCounts.get(playerId) || 0),
+    );
+    const payload = {
+      equalization_started_at: new Date().toISOString(),
+      official_games_target: target,
+      equalization_roster: roster,
+    };
+    const save = async () => {
+      if (!navigator.onLine) {
+        enqueueGameDayOperation(event.id, "update_event_settings", { payload });
+        setPendingOperationCount(pendingGameDayOperations(event.id).length);
+        onEventUpdated?.({ ...event, ...payload });
+        setMessage(
+          `Offline · Final equalization started. Every official player is capped at ${target} games.`,
+        );
+        return;
+      }
+      const { data, error } = await supabase
+        .from("events")
+        .update(payload)
+        .eq("id", event.id)
+        .select()
+        .single();
+      if (error) {
+        equalizationSnapshotRequested.current = false;
+        setMessage(`Final equalization could not start: ${error.message}`);
+        return;
+      }
+      onEventUpdated?.(data);
+      setMessage(
+        `Final equalization started. Every official player is capped at ${target} games.`,
+      );
+    };
+    save();
+  }, [
+    equalizationActive,
+    event.equalization_started_at,
+    event.id,
+    checkedIn,
+    officialEffectiveCounts,
+  ]);
+
+  useEffect(() => {
+    if (
+      !officialGamesTarget ||
+      officialPlayLocked ||
+      rankingsLockRequested.current ||
+      remainingOfficialIds.length
+    )
+      return;
+    rankingsLockRequested.current = true;
+    const payload = { rankings_locked_at: new Date().toISOString() };
+    const save = async () => {
+      if (!navigator.onLine) {
+        enqueueGameDayOperation(event.id, "update_event_settings", { payload });
+        setPendingOperationCount(pendingGameDayOperations(event.id).length);
+        onEventUpdated?.({ ...event, ...payload });
+        setMessage("Offline · Official play is complete and rankings are locked.");
+        return;
+      }
+      const { data, error } = await supabase
+        .from("events")
+        .update(payload)
+        .eq("id", event.id)
+        .select()
+        .single();
+      if (error) {
+        rankingsLockRequested.current = false;
+        setMessage(`Rankings could not be locked: ${error.message}`);
+        return;
+      }
+      onEventUpdated?.(data);
+      setMessage("Official play is complete and rankings are locked.");
+    };
+    save();
+  }, [
+    officialGamesTarget,
+    officialPlayLocked,
+    remainingOfficialIds.length,
+    event.id,
+  ]);
   const partnerCounts = useMemo(() => {
     const counts = new Map();
     completedGames.forEach((game) => {
@@ -605,14 +752,20 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           Number(b.waitedLong) - Number(a.waitedLong) ||
           a.queueIndex - b.queueIndex,
       );
-    if (ranked.length < playersNeeded) return [];
+    const rankedForMatch =
+      equalizationActive && officialGamesTarget
+        ? ranked.filter((player) => remainingOfficialSet.has(player.id))
+        : ranked;
+    // When fewer than four official players remain, the organizer chooses the
+    // fill-ins manually so the exemption is visible before the match is made.
+    if (rankedForMatch.length < playersNeeded) return [];
     if (event.game_format !== "open_play" || playersNeeded !== 4)
-      return ranked.slice(0, playersNeeded).map((player) => player.id);
+      return rankedForMatch.slice(0, playersNeeded).map((player) => player.id);
 
     // Games played always has priority. Within a fair front pool, the selected
     // mode controls how strongly skill compatibility affects the next group.
     // A player waiting at least 15 minutes receives queue priority protection.
-    const pool = ranked.slice(0, Math.min(20, ranked.length));
+    const pool = rankedForMatch.slice(0, Math.min(20, rankedForMatch.length));
     let best = null;
     for (let a = 0; a < pool.length - 3; a += 1)
       for (let b = a + 1; b < pool.length - 2; b += 1)
@@ -647,12 +800,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               repeatedPartners;
             if (!best || score < best.score) best = { score, ids: arranged };
           }
-    return best?.ids || ranked.slice(0, 4).map((player) => player.id);
+    return best?.ids || rankedForMatch.slice(0, 4).map((player) => player.id);
   }
 
   useEffect(() => {
     if (
       eventEnded ||
+      officialPlayLocked ||
       !event.auto_assign_next_players ||
       autoQueueing ||
       !availableCheckedInNotQueued.length
@@ -704,6 +858,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   useEffect(() => {
     if (
       eventEnded ||
+      officialPlayLocked ||
       !event.auto_assign_next_players ||
       autoAssigning ||
       autoQueueing ||
@@ -1264,8 +1419,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   async function createMatchFor(playerIds, automatic = false) {
     setMessage("");
-    if (eventEnded) {
-      setMessage("This event has ended. New matches are disabled.");
+    if (eventEnded || officialPlayLocked) {
+      setMessage(
+        officialPlayLocked
+          ? "Official play is complete. Rankings and new matches are locked."
+          : "This event has ended. New matches are disabled.",
+      );
       return false;
     }
     if (playerIds.length !== playersNeeded) {
@@ -1275,6 +1434,28 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     if (unassignedQueuedGames.length) {
       setMessage("A next match is already paired and waiting for a court.");
       return false;
+    }
+    if (equalizationActive && officialGamesTarget) {
+      const selectedOfficial = playerIds.filter((playerId) =>
+        remainingOfficialSet.has(playerId),
+      );
+      if (remainingWaitingIds.length >= playersNeeded &&
+          selectedOfficial.length !== playersNeeded) {
+        setMessage(
+          "Final equalization is active. Select only players who are still below the official game target.",
+        );
+        return false;
+      }
+      if (
+        remainingWaitingIds.length > 0 &&
+        remainingWaitingIds.length < playersNeeded &&
+        !remainingWaitingIds.every((playerId) => playerIds.includes(playerId))
+      ) {
+        setMessage(
+          "Include every remaining official player, then choose fill-ins for the open spots.",
+        );
+        return false;
+      }
     }
     const gameNumber = games.length
       ? Math.max(...games.map((game) => game.game_number)) + 1
@@ -1301,6 +1482,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         game_id: game.id,
         player_registration_id: playerId,
         team_number: index < teamSize ? 1 : 2,
+        counts_toward_standings:
+          !officialGamesTarget || remainingOfficialSet.has(playerId),
+        is_fill_in:
+          Boolean(officialGamesTarget) && !remainingOfficialSet.has(playerId),
       }));
       enqueueGameDayOperation(event.id, "create_match", {
         game,
@@ -1340,6 +1525,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       game_id: game.id,
       player_registration_id: playerId,
       team_number: index < teamSize ? 1 : 2,
+      counts_toward_standings:
+        !officialGamesTarget || remainingOfficialSet.has(playerId),
+      is_fill_in:
+        Boolean(officialGamesTarget) && !remainingOfficialSet.has(playerId),
     }));
     const { data: inserted, error: playerError } = await supabase
       .from("game_players")
@@ -2283,6 +2472,24 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           })}
         </div>
       </section>}
+      {officialGamesTarget > 0 && (
+        <div className={`form-message ${officialPlayLocked ? "success" : ""}`}>
+          {officialPlayLocked ? (
+            <strong>Official play complete · Rankings locked at {officialGamesTarget} games per player.</strong>
+          ) : (
+            <strong>
+              Final equalization · Target {officialGamesTarget} games · {remainingOfficialIds.length} player
+              {remainingOfficialIds.length === 1 ? "" : "s"} remaining
+            </strong>
+          )}
+          {!officialPlayLocked && remainingWaitingIds.length > 0 && remainingWaitingIds.length < playersNeeded && (
+            <span>
+              {" "}Select the remaining official player{remainingWaitingIds.length === 1 ? "" : "s"} and add
+              fill-ins. Fill-in results will not count toward their standings.
+            </span>
+          )}
+        </div>
+      )}
       <div className="game-day-workspace">
         <div className="game-day-grid game-day-main">
         <section className="profile-card" data-tour="waiting-queue">
@@ -2302,7 +2509,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 >
                   <input
                     type="checkbox"
-                    disabled={eventEnded}
+                    disabled={
+                      eventEnded ||
+                      officialPlayLocked ||
+                      (equalizationActive &&
+                        officialGamesTarget > 0 &&
+                        remainingWaitingIds.length >= playersNeeded &&
+                        !remainingOfficialSet.has(entry.player_registration_id))
+                    }
                     checked={selectedPlayers.includes(
                       entry.player_registration_id,
                     )}
@@ -2324,6 +2538,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                         ),
                       )}{" "}
                       min
+                      {officialGamesTarget > 0 && (
+                        <>
+                          {" "}· {playerGameCounts.get(entry.player_registration_id) || 0}/
+                          {officialGamesTarget} official games
+                          {!remainingOfficialSet.has(entry.player_registration_id) && " · Fill-in"}
+                        </>
+                      )}
                     </span>
                   </div>
                   <button
@@ -2345,7 +2566,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               <button
                 className="button button-secondary"
                 onClick={selectNextPlayers}
-                disabled={eventEnded || waiting.length < 4}
+                disabled={eventEnded || officialPlayLocked || waiting.length < 4}
               >
                 Select next four players
               </button>
@@ -2353,14 +2574,16 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             <button
               className="button button-primary"
               onClick={createMatch}
-              disabled={eventEnded || selectedPlayers.length !== playersNeeded}
+              disabled={eventEnded || officialPlayLocked || selectedPlayers.length !== playersNeeded}
             >
               <Swords size={16} /> Create match ({selectedPlayers.length}/
               {playersNeeded})
             </button>
             <small>
               {event.game_format === "open_play"
-                ? "Queue order assigns the first two to Team 1 and the next two to Team 2. The pairing waits in Next Match until a court opens."
+                ? officialGamesTarget > 0
+                  ? "Official players count toward the target. Players marked Fill-in can complete the final match, but this result does not affect their standings."
+                  : "Queue order assigns the first two to Team 1 and the next two to Team 2. The pairing waits in Next Match until a court opens."
                 : "Selection order assigns Team 1, then Team 2. The pairing waits in Next Match until a court opens."}
             </small>
           </div>
