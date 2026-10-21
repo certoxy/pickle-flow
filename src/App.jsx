@@ -5,6 +5,7 @@ import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
+  Clock3,
   Copy,
   Download,
   Edit3,
@@ -2981,9 +2982,26 @@ function PublicRegistration({ code, onHome }) {
         <div className="event-meta">
           <span>
             <CalendarDays size={17} />{" "}
-            {new Date(`${event.event_date}T00:00:00`).toLocaleDateString()}{" "}
-            {event.start_time ? `· ${event.start_time.slice(0, 5)}` : ""}
+            {new Date(`${event.event_date}T00:00:00`).toLocaleDateString()}
           </span>
+          {(event.start_time || event.play_end_time) && (
+            <span>
+              <Clock3 size={17} /> Play time:{" "}
+              {event.start_time
+                ? new Date(`2000-01-01T${event.start_time}`).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })
+                : "Not specified"}
+              {" – "}
+              {event.play_end_time
+                ? new Date(`2000-01-01T${event.play_end_time}`).toLocaleTimeString([], {
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })
+                : "Not specified"}
+            </span>
+          )}
           <span>
             <MapPin size={17} /> {event.venue}
             {event.city ? `, ${event.city}` : ""}
