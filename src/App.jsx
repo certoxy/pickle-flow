@@ -108,61 +108,226 @@ const addDays = (date, days) => {
 
 const PUBLIC_PAGES = {
   "/how-it-works": {
+    path: "/how-it-works",
     eyebrow: "From signup to final score",
-    title: "How PickleFlow keeps game day moving",
+    title: "How PickleFlow Keeps Game Day Moving",
+    seoTitle: "How PickleFlow Works | Pickleball Event Workflow",
     description: "See how organizers use PickleFlow to create an event, register players, run fair open play, score matches, and share live court updates.",
-    intro: "PickleFlow connects every part of a pickleball event in one simple, mobile-friendly flow. Organizers stay in control while players, scorers, and spectators see exactly what they need.",
+    intro: "PickleFlow connects registration, player check-in, court assignments, scoring, standings, and venue displays in one mobile-friendly organizer workflow.",
     image: "/product-previews/game-day.svg",
-    imageAlt: "PickleFlow Game Day organizer screen",
+    imageAlt: "PickleFlow Game Day organizer dashboard showing courts and player queue",
+    updated: "October 21, 2026",
     steps: [
       ["Create the event", "Set the schedule, venue, player limit, courts, game format, and points to win."],
       ["Share registration", "Send one registration link or QR code so players can join from any phone."],
       ["Check in players", "Confirm arrivals, add walk-ins, import a list, and place available players in the queue."],
-      ["Run every court", "Automatically prepare the next matches, score from court-side phones, and handle substitutions."],
+      ["Run every court", "Prepare the next matches, score from court-side phones, and handle substitutions."],
       ["Display live updates", "Show current scores, next matches, waiting players, and winners on a shared Match Board."],
     ],
+    related: ["/open-play-management", "/offline-scoring", "/court-management"],
   },
   "/pickleball-event-management": {
+    path: "/pickleball-event-management",
     eyebrow: "Pickleball event management",
-    title: "One organized home for your pickleball event",
+    title: "One Organized Home for Your Pickleball Event",
+    seoTitle: "Pickleball Event Management Software | PickleFlow",
     description: "Free pickleball event management software for organizer registration, player lists, check-ins, court assignments, queues, and event reports.",
     intro: "Replace scattered spreadsheets, paper lists, and group-chat updates with an organizer workspace designed for community events and club game days.",
     image: "/product-previews/event-roster.svg",
     imageAlt: "PickleFlow event roster and player management screen",
+    updated: "October 21, 2026",
     steps: [
       ["Simple player registration", "Share a link or QR code and collect player names, skill levels, and optional contact details."],
       ["Flexible roster tools", "Add walk-ins, import CSV lists, prevent duplicate names, substitute players, and export event details."],
       ["Mobile check-in", "See who has arrived and move players from check-in to the waiting queue with clear statuses."],
       ["Multiple courts", "Monitor active and next matches per court without losing sight of the full event."],
     ],
+    limitations: "PickleFlow currently focuses on event and open-play operations. Club membership billing and recurring subscriptions are not part of the current organizer workflow.",
+    related: ["/how-it-works", "/court-management", "/player-standings"],
   },
   "/open-play-management": {
-    eyebrow: "Fair, faster open play",
-    title: "Manage pickleball open play without a paper queue",
-    description: "Run fair pickleball open play rotations with player check-in, waiting queues, automatic match creation, substitutions, and per-court next matches.",
-    intro: "PickleFlow helps clubs keep rotations transparent and courts active. Everyone can see whether a player is checked in, waiting, in a game, or out of the event.",
+    path: "/open-play-management",
+    eyebrow: "Fair player rotation and live scoring",
+    title: "Pickleball Open Play Management Made Simple",
+    seoTitle: "Pickleball Open Play Organizer & Scoring App | PickleFlow",
+    description: "Organize pickleball open play with fair player rotation, court assignments, live scoring, standings, and offline support. Explore PickleFlow.",
+    intro: "Pickleball open play management software helps organizers coordinate player registration, check-ins, court assignments, partner rotations, scoring, and event standings. PickleFlow brings those activities into one web-based workspace.",
     image: "/product-previews/game-day.svg",
-    imageAlt: "PickleFlow open play courts and player queue",
-    steps: [
-      ["Clear player statuses", "Track Check In, Join Queue, Waiting, In-Game, and Out without maintaining a separate list."],
-      ["Automatic next matches", "When enabled, PickleFlow selects eligible waiting players and keeps the next match ready for each court."],
-      ["Practical substitutions", "Replace a player when needed and prioritize the substituted player for the next immediate game."],
-      ["Live shared queue", "Let the Match Board keep players informed while organizers manage from their phones."],
+    imageAlt: "PickleFlow open play organizer dashboard with multiple courts and waiting queue",
+    updated: "October 21, 2026",
+    definition: "PickleFlow is designed for small clubs, community organizers, and private game days that need a transparent player queue, multi-court match flow, live scoring, and results without maintaining separate spreadsheets.",
+    sections: [
+      {
+        title: "What Is Pickleball Open Play Management Software?",
+        copy: "It is a tool for coordinating who is ready to play, who is already on court, which match is next, and how completed games affect standings. PickleFlow keeps these states connected so organizers do not have to update several lists."
+      },
+      {
+        title: "Common Challenges for Pickleball Organizers",
+        copy: "Typical problems include unequal game counts, repeated partners, late arrivals, idle courts, hard-to-follow scores, and disputed standings. PickleFlow provides visible statuses and consistent assignment rules, but does not claim mathematically perfect fairness in every player and court combination."
+      },
+      {
+        title: "How Fair Player Rotation Works",
+        copy: "When automatic assignment is enabled, PickleFlow prioritizes waiting players with fewer completed games. For four-player Open Play matches, it evaluates available team combinations and chooses the arrangement with the fewest previous teammate pairings. Partner repetition can still occur when no unused pairing is available."
+      },
+      {
+        title: "Managing Multiple Courts and Player Queues",
+        copy: "The organizer sees checked-in, waiting, in-game, and out players alongside every court. A match may be paired before a court is free and remain court-pending until an available court can accept it. Only one active or queued match can occupy a court."
+      },
+      {
+        title: "How Offline Scoring and Recovery Work",
+        copy: "After the event has been loaded in the same browser, the organizer can continue adding and checking in players, changing queue status, pairing and assigning matches, and recording scores during a temporary interruption. Changes are stored locally and replayed in order when connectivity returns."
+      },
+      {
+        title: "Understanding Standings and Overall Champions",
+        copy: "Completed games feed games played, wins, losses, winning percentage, accumulated score, points allowed, and point differential. Overall Champion eligibility and tie-breakers are published on the standings guide so players can see how the result is determined."
+      },
+      {
+        title: "PickleFlow and Other Pickleball Management Apps",
+        copy: "PickleFlow emphasizes organizer-controlled Open Play, browser-based access, games-played-aware rotation, partner variety, offline continuity, and a large-screen Match Board. Evidence-based competitor comparisons will be published only after each capability and price is verified from dated sources."
+      }
     ],
+    faq: [
+      ["Does PickleFlow guarantee every player the same number of games?", "No. It prioritizes players with fewer completed games, which is intended to reduce differences, but player arrivals, departures, substitutions, court availability, and event ending time can affect the final count."],
+      ["Can a new player join after games have started?", "Yes. A newly checked-in player with no completed games can be prioritized when the other checked-in players have already played."],
+      ["Does PickleFlow prevent repeated partners?", "It minimizes repeated teammate pairings when alternative combinations are available. Repeats may be necessary when the available player pool has no unused pairing."],
+      ["Can organizers keep working without internet?", "Yes, for a previously loaded event in the same browser. Local changes synchronize after the connection returns. A browser that has never loaded the event cannot start a cold offline session."]
+    ],
+    limitations: "Offline Game Day depends on the event having been loaded previously in that browser and on local browser storage remaining available. Cross-device offline synchronization is not currently guaranteed.",
+    related: ["/fair-player-rotation", "/offline-scoring", "/court-management", "/player-standings", "/faq"],
+  },
+  "/fair-player-rotation": {
+    path: "/fair-player-rotation",
+    eyebrow: "Transparent Open Play methodology",
+    title: "How PickleFlow Rotates Players and Partners Fairly",
+    seoTitle: "Fair Pickleball Player Rotation for Open Play | PickleFlow",
+    description: "Learn how PickleFlow prioritizes fewer games played and reduces repeated doubles partnerships during pickleball open play.",
+    intro: "Fair rotation is not simply first in, first out. PickleFlow considers completed game counts first, preserves queue order as a tie-breaker, and then arranges selected players to reduce repeated partnerships.",
+    image: "/product-previews/game-day.svg",
+    imageAlt: "PickleFlow waiting queue used for fair Open Play player rotation",
+    updated: "October 21, 2026",
+    article: true,
+    sections: [
+      { title: "Step 1: Prioritize Fewer Games Played", copy: "Waiting players are ranked by completed games. Players with fewer games are considered first, while queue position breaks ties between players with the same game count." },
+      { title: "Step 2: Support Late Check-ins", copy: "When a newly checked-in player has zero games and every other checked-in player has already played, that player can be moved toward the front of the upcoming rotation." },
+      { title: "Step 3: Reduce Repeated Partnerships", copy: "For a four-player Open Play match, PickleFlow compares the three possible doubles team arrangements and selects the arrangement with the lowest combined count of previous teammate pairings." },
+      { title: "What the Method Does Not Guarantee", copy: "It does not guarantee identical waiting times, opponents, or final game totals. Departures, substitutions, odd player counts, disabled courts, and ending the event early can change the outcome." },
+      { title: "Planned Evidence", copy: "A reproducible simulation for 12, 16, and 20 players across three to five courts is planned. Games-played spread, partner repetitions, waiting intervals, and court utilization will be published only after the test dataset is produced and reviewed." }
+    ],
+    faq: [
+      ["What happens when all partnerships have already occurred?", "The system selects the available arrangement with the lowest recorded partnership repetition count."],
+      ["Is queue position ignored?", "No. Queue position remains the tie-breaker when players have completed the same number of games."]
+    ],
+    related: ["/open-play-management", "/court-management", "/player-standings"],
+  },
+  "/offline-scoring": {
+    path: "/offline-scoring",
+    eyebrow: "Temporary connection-loss support",
+    title: "Pickleball Scoring and Game Day Operations Without Internet",
+    seoTitle: "Offline Pickleball Scoring & Game Day Operations | PickleFlow",
+    description: "See which PickleFlow scoring, player, queue, and match actions continue during a temporary internet interruption and how reconnection sync works.",
+    intro: "PickleFlow can continue selected Game Day operations in a browser that loaded the event while online. It saves changes locally, shows the pending-change count, and synchronizes them in order after reconnection.",
+    image: "/product-previews/game-day.svg",
+    imageAlt: "PickleFlow Offline Game Day controls and pending synchronization status",
+    updated: "October 21, 2026",
+    article: true,
+    sections: [
+      { title: "What Works During a Temporary Interruption", copy: "In the organizer browser, locally supported actions include adding a player, checking a player in, joining or leaving the queue, marking a player out, creating and assigning matches, starting games, recording scores, completing games, and returning Open Play participants to the queue." },
+      { title: "How Local Recovery Works", copy: "The latest event state is cached in browser storage. Each change is added to an ordered outbox with a browser device identifier. When connectivity returns, PickleFlow replays pending operations before refreshing the server state." },
+      { title: "Previously Loaded Browser Required", copy: "The organizer must load the event online at least once in the same browser. A new device or cleared browser cannot retrieve event data without a connection." },
+      { title: "Current Limits", copy: "Local data can be lost if site storage is cleared. Fully offline synchronization between separate devices is not guaranteed. Court-scoring devices and the organizer browser may require reconnection before all screens show the same final state." },
+      { title: "Recommended Organizer Practice", copy: "Open Game Day and confirm the event, players, and courts before arriving at a venue with unreliable signal. Keep the organizer tab open, avoid clearing browser data, and reconnect before closing the event." }
+    ],
+    faq: [
+      ["Will offline changes overwrite online changes?", "Pending organizer-browser changes are replayed in their recorded order. Avoid using a second organizer device during the interruption because cross-device conflict merging is limited."],
+      ["Can I open the event for the first time while fully offline?", "No. The browser needs a previously cached copy of that event."],
+      ["How do I know changes are waiting?", "Game Day displays offline or syncing status together with the number of pending local changes."]
+    ],
+    limitations: "Offline support is intended for temporary signal loss in a previously loaded organizer browser. It is not a substitute for a server connection across multiple independent devices.",
+    related: ["/open-play-management", "/how-it-works", "/court-management"],
+  },
+  "/court-management": {
+    path: "/court-management",
+    eyebrow: "Multi-court Game Day control",
+    title: "Manage Pickleball Courts, Queues, and Upcoming Matches",
+    seoTitle: "Pickleball Court & Queue Management | PickleFlow",
+    description: "Manage multiple pickleball courts, waiting players, court-pending matches, mobile scoring links, and live venue updates with PickleFlow.",
+    intro: "PickleFlow gives the organizer one view of court availability, active matches, the waiting queue, and the next paired match.",
+    image: "/product-previews/match-board.svg",
+    imageAlt: "PickleFlow multi-court Match Board with active and upcoming matches",
+    updated: "October 21, 2026",
+    sections: [
+      { title: "Pair Before a Court Is Available", copy: "Automatic assignment can create the next fair match while all courts are busy. The match remains marked court-pending until a court becomes available." },
+      { title: "Protect Each Court from Duplicate Assignments", copy: "PickleFlow prevents a second active or queued match from being assigned to a court that already has one. If older data contains a collision, the extra queued match is returned to the pending position." },
+      { title: "Court-specific Mobile Scoring", copy: "An organizer can provide a court scoring link or QR code. The scorer sees the assigned game, serving team and service number, while scores synchronize to the organizer and Match Board when online." },
+      { title: "Large-screen Match Board", copy: "A smart TV display can show court activity, scores, serving side, waiting players, court-pending matches, recent results, and standings." }
+    ],
+    related: ["/open-play-management", "/live-pickleball-scoring", "/offline-scoring"],
+  },
+  "/player-standings": {
+    path: "/player-standings",
+    eyebrow: "Explainable results",
+    title: "Pickleball Open Play Standings and Overall Champion",
+    seoTitle: "Open Play Standings & Champion Methodology | PickleFlow",
+    description: "Understand PickleFlow player standings, winning percentage, accumulated score, eligibility, and Overall Champion tie-breakers.",
+    intro: "PickleFlow derives standings from completed games and displays the ranking inputs so organizers and players can understand the results.",
+    image: "/product-previews/game-day.svg",
+    imageAlt: "PickleFlow player standings and champion highlights",
+    updated: "October 21, 2026",
+    article: true,
+    sections: [
+      { title: "Statistics from Completed Games", copy: "For each checked-in player, PickleFlow calculates games played, wins, losses, winning percentage, accumulated team score, points allowed, and point differential." },
+      { title: "Champion Eligibility", copy: "The eligible group includes players who completed at least one fewer game than the event maximum, with a minimum requirement of one completed game." },
+      { title: "Ranking and Tie-breakers", copy: "Eligible players are ordered by winning percentage, then wins, point differential, accumulated score, and finally the fewest points allowed. An exact tie across those inputs produces co-champions." },
+      { title: "Top 5 Player Highlights", copy: "Separate Top 5 lists show winning percentage leaders and accumulated-score leaders. Organizers can download the champion and leaderboard cards as shareable images." },
+      { title: "Product-specific Methodology", copy: "This is PickleFlow's event-ranking method, not an official tournament rule. Organizers should publish their chosen event rules before play begins." }
+    ],
+    faq: [
+      ["Why is the highest total score not automatically the champion?", "Accumulated score rewards total scoring but also increases with games played. PickleFlow therefore uses winning percentage first for the Overall Champion calculation."],
+      ["Can two players be champions?", "Yes. Players are shown as co-champions when all published ranking and tie-breaker values are exactly equal."]
+    ],
+    related: ["/open-play-management", "/fair-player-rotation", "/faq"],
   },
   "/live-pickleball-scoring": {
+    path: "/live-pickleball-scoring",
     eyebrow: "Live pickleball scoring",
-    title: "Score each court from a phone and update the Match Board live",
-    description: "Mobile pickleball scoring with real-time smart TV Match Board updates, next matches, player queues, winner standings, and optional voice announcements.",
-    intro: "Give an umpire or scorer secure access to one court. Score changes synchronize to the organizer and large-screen display, keeping the entire venue informed.",
+    title: "Score Each Court from a Phone and Update the Match Board Live",
+    seoTitle: "Live Mobile Pickleball Scoring & Match Board | PickleFlow",
+    description: "Mobile pickleball scoring with real-time smart TV Match Board updates, serving indicators, next matches, player queues, and standings.",
+    intro: "Give an umpire or scorer access to one court. Online score changes synchronize to the organizer and large-screen display, keeping the venue informed.",
     image: "/product-previews/match-board.svg",
     imageAlt: "PickleFlow live pickleball Match Board",
+    updated: "October 21, 2026",
     steps: [
       ["Court-specific scorer links", "Share a QR code for a scorer to open the assigned court directly on a mobile device."],
       ["Real-time synchronization", "Scores update across connected organizer, scorer, and Match Board devices."],
+      ["Serving controls", "Display the serving team and first or second service while disabling the non-serving team's score button."],
       ["Confirmed completion", "When the winning score is reached, confirm the result before PickleFlow completes the game."],
-      ["Venue-ready display", "Present courts, scores, upcoming matches, the queue, winners, and voice announcements on a smart TV."],
+      ["Venue-ready display", "Present courts, scores, upcoming matches, the queue, winners, and standings on a smart TV."],
     ],
+    limitations: "PickleFlow's serving control supports the app's current Open Play workflow. Organizers remain responsible for applying the rules selected for their event.",
+    related: ["/court-management", "/offline-scoring", "/player-standings"],
+  },
+  "/faq": {
+    path: "/faq",
+    eyebrow: "Organizer questions",
+    title: "PickleFlow Frequently Asked Questions",
+    seoTitle: "PickleFlow FAQ | Open Play, Offline Scoring & Courts",
+    description: "Answers about PickleFlow registration, fair player rotation, offline Game Day, court scoring, standings, data retention, and organizer limits.",
+    intro: "These answers describe the current PickleFlow application and its practical limits as of October 21, 2026.",
+    image: "/product-previews/event-roster.svg",
+    imageAlt: "PickleFlow organizer workspace",
+    updated: "October 21, 2026",
+    faq: [
+      ["Is PickleFlow free?", "Organizer registration and the current core event workflow are free. Donations are optional. Active-event limits apply, and approved donation packages can increase an organizer's limit."],
+      ["What player statuses are available?", "Players move through Check In, Join Queue, Waiting, In-Game, and Out states during Game Day."],
+      ["How does automatic match creation work?", "When enabled and enough eligible players are waiting, PickleFlow prepares the next pairing using games played and queue position, then assigns it when a court is available."],
+      ["Can PickleFlow work without internet?", "Selected organizer operations continue for a previously loaded event in the same browser. The app synchronizes pending local changes after connectivity returns."],
+      ["How long is detailed event data retained?", "The current policy schedules detailed event data for deletion 72 hours after event completion. The retained event summary may include the event name and aggregate player and game counts."],
+      ["Can players score games from their phones?", "Yes. The organizer can share a court-specific scoring link or QR code. Online changes update the organizer dashboard and Match Board."],
+      ["How is the Open Play champion selected?", "Eligible players are ranked by winning percentage, wins, point differential, accumulated score, and fewest points allowed. Exact ties produce co-champions."],
+      ["Does PickleFlow guarantee perfect fairness?", "No. It prioritizes fewer games and minimizes repeated partnerships where possible, but attendance changes, court availability, and event duration affect outcomes."]
+    ],
+    related: ["/how-it-works", "/open-play-management", "/offline-scoring", "/player-standings"],
   },
 };
 
@@ -189,6 +354,69 @@ function setDocumentMeta({ title, description, canonical, noindex = false }) {
 }
 
 function MarketingPage({ page, onStart }) {
+  useEffect(() => {
+    const id = "pickleflow-page-schema";
+    document.getElementById(id)?.remove();
+    const script = document.createElement("script");
+    script.id = id;
+    script.type = "application/ld+json";
+    const origin = "https://pickleflow.paotechs.com";
+    const graph = [
+      {
+        "@type": "Organization",
+        "@id": "https://paotechs.com/#organization",
+        name: "PAOTECHS",
+        url: "https://paotechs.com/",
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": origin + "/#software",
+        name: "PickleFlow",
+        url: origin + "/",
+        applicationCategory: "SportsApplication",
+        operatingSystem: "Web",
+        description: "Web-based pickleball event management software for open play, player rotation, court assignments, scoring and standings.",
+        publisher: { "@id": "https://paotechs.com/#organization" },
+      },
+      {
+        "@type": "WebPage",
+        "@id": origin + page.path + "#webpage",
+        url: origin + page.path,
+        name: page.seoTitle || page.title,
+        description: page.description,
+        dateModified: "2026-10-21",
+        about: { "@id": origin + "/#software" },
+        publisher: { "@id": "https://paotechs.com/#organization" },
+      },
+    ];
+    if (page.article) {
+      graph.push({
+        "@type": "Article",
+        "@id": origin + page.path + "#article",
+        headline: page.title,
+        description: page.description,
+        mainEntityOfPage: origin + page.path,
+        dateModified: "2026-10-21",
+        publisher: { "@id": "https://paotechs.com/#organization" },
+      });
+    }
+    script.textContent = JSON.stringify({ "@context": "https://schema.org", "@graph": graph });
+    document.head.appendChild(script);
+    return () => script.remove();
+  }, [page]);
+
+  const relatedLabels = {
+    "/how-it-works": "How PickleFlow works",
+    "/pickleball-event-management": "Event management",
+    "/open-play-management": "Open Play management",
+    "/fair-player-rotation": "Fair player rotation",
+    "/offline-scoring": "Offline scoring and recovery",
+    "/court-management": "Court and queue management",
+    "/player-standings": "Standings and champion method",
+    "/live-pickleball-scoring": "Live mobile scoring",
+    "/faq": "Organizer FAQ",
+  };
+
   return (
     <main className="seo-page">
       <section className="seo-hero">
@@ -198,20 +426,73 @@ function MarketingPage({ page, onStart }) {
           <p>{page.intro}</p>
           <div className="hero-actions">
             <button className="button button-primary" onClick={onStart}>Create your free event</button>
-            <a className="button button-secondary" href="/how-it-works">See how it works</a>
+            {page.path !== "/how-it-works" && <a className="button button-secondary" href="/how-it-works">See how it works</a>}
           </div>
+          <small className="seo-updated">Published by PAOTECHS · Last updated {page.updated}</small>
         </div>
-        <img src={page.image} alt={page.imageAlt} />
+        <figure>
+          <img src={page.image} alt={page.imageAlt} />
+          <figcaption>{page.imageAlt}</figcaption>
+        </figure>
       </section>
-      <section className="seo-benefits">
-        <span className="eyebrow">Made for real game days</span>
-        <h2>Everything stays in one flow.</h2>
-        <div>
-          {page.steps.map(([title, copy], index) => (
-            <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{copy}</p></article>
+
+      {page.definition && <aside className="seo-definition"><strong>In brief</strong><p>{page.definition}</p></aside>}
+
+      {page.sections?.length > 0 && (
+        <section className="seo-content" aria-label={page.title + " guide"}>
+          {page.sections.map((section) => (
+            <article key={section.title}>
+              <h2>{section.title}</h2>
+              <p>{section.copy}</p>
+              {section.points?.length > 0 && <ul>{section.points.map((point) => <li key={point}>{point}</li>)}</ul>}
+            </article>
           ))}
-        </div>
-      </section>
+        </section>
+      )}
+
+      {page.steps?.length > 0 && (
+        <section className="seo-benefits">
+          <span className="eyebrow">Made for real game days</span>
+          <h2>Everything stays in one flow.</h2>
+          <div>
+            {page.steps.map(([title, copy], index) => (
+              <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{copy}</p></article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {page.limitations && (
+        <section className="seo-limitations">
+          <span className="eyebrow">Current scope and limitations</span>
+          <h2>What organizers should know</h2>
+          <p>{page.limitations}</p>
+        </section>
+      )}
+
+      {page.faq?.length > 0 && (
+        <section className="seo-faq">
+          <span className="eyebrow">Frequently asked questions</span>
+          <h2>Clear answers for organizers</h2>
+          <div>
+            {page.faq.map(([question, answer]) => (
+              <details key={question}>
+                <summary>{question}</summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {page.related?.length > 0 && (
+        <nav className="seo-related" aria-label="Related PickleFlow guides">
+          <span className="eyebrow">Continue exploring</span>
+          <h2>Related organizer guides</h2>
+          <div>{page.related.map((path) => <a key={path} href={path}>{relatedLabels[path] || path}</a>)}</div>
+        </nav>
+      )}
+
       <section className="seo-cta">
         <h2>Spend less time managing. Keep more players on court.</h2>
         <p>PickleFlow is free for organizers and works on phones, tablets, desktops, and smart TV displays.</p>
@@ -422,9 +703,13 @@ function Landing({ onStart, onLogin }) {
           </div>
           <nav className="seo-link-grid" aria-label="Explore PickleFlow features">
             <a href="/how-it-works"><strong>How PickleFlow works</strong><span>Follow the complete organizer workflow.</span></a>
-            <a href="/pickleball-event-management"><strong>Event management</strong><span>Registration, rosters, check-in, and reports.</span></a>
-            <a href="/open-play-management"><strong>Open play management</strong><span>Fair queues, rotations, and automatic matches.</span></a>
+            <a href="/open-play-management"><strong>Open Play management</strong><span>Fair queues, rotations, automatic matches, and offline continuity.</span></a>
+            <a href="/fair-player-rotation"><strong>Fair player rotation</strong><span>See how games played and partner history affect pairing.</span></a>
+            <a href="/offline-scoring"><strong>Offline Game Day</strong><span>What continues locally and how reconnect synchronization works.</span></a>
+            <a href="/court-management"><strong>Court management</strong><span>Manage courts, queues, and court-pending matches.</span></a>
+            <a href="/player-standings"><strong>Standings & champion</strong><span>Understand statistics, eligibility, and tie-breakers.</span></a>
             <a href="/live-pickleball-scoring"><strong>Live scoring & Match Board</strong><span>Score by phone and update the venue live.</span></a>
+            <a href="/faq"><strong>Organizer FAQ</strong><span>Answers about features, limits, retention, and offline use.</span></a>
           </nav>
         </section>
         <section className="donation-card">
@@ -2803,7 +3088,7 @@ export default function App() {
     const origin = "https://pickleflow.paotechs.com";
     if (publicPage) {
       setDocumentMeta({
-        title: `${publicPage.title} | PickleFlow`,
+        title: publicPage.seoTitle || `${publicPage.title} | PickleFlow`,
         description: publicPage.description,
         canonical: `${origin}${normalizedPath}`,
       });
