@@ -2153,32 +2153,102 @@ select:focus {
   padding-top: 55px;
 }
 .registration-hero {
-  padding: 45px 10px 45px 0;
+  min-width: 0;
+  padding: 0 10px 45px 0;
+}
+.invite-hero-visual {
+  position: relative;
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
+  padding: clamp(28px, 5vw, 54px);
+  border-radius: 30px;
+  color: white;
+  background-image:
+    linear-gradient(180deg, rgba(7, 27, 36, 0.12) 5%, rgba(7, 27, 36, 0.88) 72%),
+    url("/social/pickleflow-hero.webp");
+  background-position: center;
+  background-size: cover;
+  box-shadow: 0 24px 60px rgba(18, 59, 102, 0.2);
+  isolation: isolate;
+}
+.invite-hero-visual::after {
+  position: absolute;
+  inset: 14px;
+  z-index: -1;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 22px;
+  content: "";
+  pointer-events: none;
+}
+.invite-hero-kicker {
+  width: fit-content;
+  margin-bottom: 14px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 999px;
+  color: #071b24;
+  background: #d6ff4b;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.invite-hero-visual .eyebrow {
+  color: rgba(255, 255, 255, 0.78);
 }
 .registration-hero h1 {
-  margin: 14px 0 16px;
-  color: var(--navy);
-  font-size: clamp(2.4rem, 6vw, 4.5rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
+  max-width: 760px;
+  margin: 12px 0 14px;
+  color: white;
+  font-size: clamp(2.5rem, 6vw, 4.8rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
 }
-.registration-hero > p {
+.invite-hero-visual > p {
   max-width: 650px;
-  color: var(--muted);
-  font-size: 1.08rem;
-  line-height: 1.7;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1.04rem;
+  line-height: 1.65;
 }
 .event-meta {
   display: grid;
-  gap: 13px;
-  margin-top: 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 26px;
 }
-.event-meta span {
+.event-meta span,
+.event-meta a {
+  min-width: 0;
   display: flex;
   align-items: center;
-  gap: 10px;
-  color: var(--navy);
+  gap: 9px;
+  padding: 11px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 13px;
+  color: white;
+  background: rgba(7, 27, 36, 0.42);
+  font-size: 0.84rem;
   font-weight: 700;
+  line-height: 1.35;
+  backdrop-filter: blur(10px);
+}
+.event-meta svg {
+  flex: 0 0 auto;
+  color: #d6ff4b;
+}
+.registration-hero .registration-location {
+  color: var(--navy);
+  background: white;
+  border-color: var(--border);
+  box-shadow: 0 14px 35px rgba(18, 59, 102, 0.09);
+}
+.registration-hero .registration-location-heading span {
+  color: var(--muted);
 }
 .registration-card {
   width: 100%;
@@ -2207,6 +2277,22 @@ select:focus {
 }
 
 @media (max-width: 800px) {
+  .invite-hero-visual {
+    min-height: 470px;
+    padding: 28px 22px;
+    border-radius: 24px;
+    background-position: 58% center;
+  }
+  .invite-hero-visual::after {
+    inset: 10px;
+    border-radius: 18px;
+  }
+  .event-meta {
+    grid-template-columns: 1fr;
+  }
+  .registration-hero h1 {
+    font-size: clamp(2.25rem, 12vw, 3.35rem);
+  }
   .hero {
     min-height: auto;
     grid-template-columns: 1fr;
