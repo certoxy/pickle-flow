@@ -2984,7 +2984,12 @@ function PublicRegistration({ code, onHome }) {
         <div className="event-meta">
           <span>
             <CalendarDays size={17} />{" "}
-            {new Date(`${event.event_date}T00:00:00`).toLocaleDateString([], {\n              weekday: "long",\n              month: "long",\n              day: "numeric",\n              year: "numeric",\n            })}
+            {new Date(`${event.event_date}T00:00:00`).toLocaleDateString([], {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}
           </span>
           {(event.start_time || event.play_end_time) && (
             <span>
