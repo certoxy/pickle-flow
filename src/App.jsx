@@ -2974,15 +2974,17 @@ function PublicRegistration({ code, onHome }) {
   return (
     <main className="public-registration">
       <section className="registration-hero">
-        <span className="eyebrow">
-          Player registration · {event.event_code}
-        </span>
+        <div className="invite-hero-visual">
+          <span className="invite-hero-kicker">You’re invited</span>
+          <span className="eyebrow">
+            Player registration · {event.event_code}
+          </span>
         <h1>{event.name}</h1>
         <p>{event.description || "Join this pickleball event."}</p>
         <div className="event-meta">
           <span>
             <CalendarDays size={17} />{" "}
-            {new Date(`${event.event_date}T00:00:00`).toLocaleDateString()}
+            {new Date(`${event.event_date}T00:00:00`).toLocaleDateString([], {\n              weekday: "long",\n              month: "long",\n              day: "numeric",\n              year: "numeric",\n            })}
           </span>
           {(event.start_time || event.play_end_time) && (
             <span>
@@ -3017,6 +3019,7 @@ function PublicRegistration({ code, onHome }) {
               ? "Open registration"
               : `${spots} spot${spots === 1 ? "" : "s"} remaining`}
           </span>
+        </div>
         </div>
         {event.location_lat && event.location_lng && (
           <div className="registration-location">
