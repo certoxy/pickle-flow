@@ -423,6 +423,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const unassignedQueuedGames = activeGames
     .filter((game) => game.status === "queued" && !game.court_id)
     .sort((a, b) => a.game_number - b.game_number);
+  const pendingCategoryIds = new Set(
+    unassignedQueuedGames.map((game) => game.category_id || "uncategorized"),
+  );
   const allowedSkillsForCourt = (court) => {
     if (!court.category_id) return null;
     return skillLevels
@@ -939,13 +942,16 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       !event.auto_assign_next_players ||
       autoAssigning ||
       autoQueueing ||
-      availableCheckedInNotQueued.length ||
-      unassignedQueuedGames.length
+      availableCheckedInNotQueued.length
     )
       return;
     if (waiting.length < playersNeeded) return;
     const matchCandidate = courts
-      .filter(courtCanQueueFutureMatch)
+      .filter(
+        (court) =>
+          courtCanQueueFutureMatch(court) &&
+          !pendingCategoryIds.has(court.category_id || "uncategorized"),
+      )
       .map((court) => ({
         court,
         playerIds: fairNextPlayerIds(allowedSkillsForCourt(court)),
@@ -970,11 +976,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   useEffect(() => {
     if (eventEnded || autoPlacingMatch || !unassignedQueuedGames.length) return;
-    const pendingGame = unassignedQueuedGames[0];
-    const court = courts.find((item) => courtCanAcceptMatch(item, pendingGame));
-    if (!court) return;
+    const assignable = unassignedQueuedGames
+      .map((game) => ({
+        game,
+        court: courts.find((court) => courtCanAcceptMatch(court, game)),
+      }))
+      .find((candidate) => candidate.court);
+    if (!assignable) return;
     setAutoPlacingMatch(true);
-    assignMatchToCourt(pendingGame, court).finally(() =>
+    assignMatchToCourt(assignable.game, assignable.court).finally(() =>
       setAutoPlacingMatch(false),
     );
   }, [courts, games, gamePlayers, players, skillLevels, autoPlacingMatch, eventEnded]);
@@ -1643,8 +1653,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       );
       return false;
     }
-    if (unassignedQueuedGames.length) {
-      setMessage("A next match is already paired and waiting for a court.");
+    if (
+      unassignedQueuedGames.some(
+        (game) =>
+          (game.category_id || "uncategorized") ===
+          (matchCategoryId || "uncategorized"),
+      )
+    ) {
+      setMessage("A next match for this player category is already waiting for a court.");
       return false;
     }
     if (equalizationActive && officialGamesTarget) {
