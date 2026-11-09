@@ -450,7 +450,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const courtCanQueueFutureMatch = (court) =>
     court.status !== "disabled" && court.accepting_matches !== false;
   const isNextMatch = (game) =>
-    game.status === "queued" && !game.court_id;
+    game.status === "queued";
   const eventEnded = event.status === "completed";
   const playEndAt = useMemo(() => {
     if (!event.event_date || !event.play_end_time) return null;
@@ -2843,7 +2843,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   <span
                     className={`status-badge ${isNextMatch(game) ? "next-match" : game.status}`}
                   >
-                    {isNextMatch(game) ? "Next match · Unassigned" : game.status}
+                    {isNextMatch(game)
+                      ? game.court_id
+                        ? "Next match · Ready"
+                        : "Next match · Court pending"
+                      : game.status}
                   </span>
                 </div>
                 <div className="teams">
