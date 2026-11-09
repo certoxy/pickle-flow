@@ -40,6 +40,13 @@ import GameDay from "./GameDay";
 import CourtScoring from "./CourtScoring";
 import MatchBoard from "./MatchBoard";
 import ContextualTour from "./ContextualTour";
+import SkillLevelManager from "./SkillLevelManager";
+import {
+  DEFAULT_SKILL_LEVELS,
+  loadEventSkillLevels,
+  skillCodeFromName,
+  skillLevelLabel,
+} from "./lib/skillLevels";
 
 const emptyProfile = {
   full_name: "",
@@ -72,13 +79,6 @@ const emptyPlayer = {
   phone: "",
   skill_level: "beginner",
 };
-
-const skillLevelLabel = (value) =>
-  value === "novice"
-    ? "New Player"
-    : String(value || "")
-        .replaceAll("_", " ")
-        .replace(/\b\w/g, (letter) => letter.toUpperCase());
 
 async function sendNotification(type, payload) {
   try {
@@ -1798,6 +1798,8 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
     [showReopenPrompt, setShowReopenPrompt] = useState(false),
     [reopening, setReopening] = useState(false),
     [showImport, setShowImport] = useState(false),
+    [showSkillLevels, setShowSkillLevels] = useState(false),
+    [skillLevels, setSkillLevels] = useState(DEFAULT_SKILL_LEVELS),
     [importRows, setImportRows] = useState([]),
     [importing, setImporting] = useState(false);
   useEffect(() => {
@@ -1824,7 +1826,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
   );
   async function loadPlayers() {
     setLoading(true);
-    const [{ data }, { data: requests }] = await Promise.all([
+    const [{ data }, { data: requests }, levels] = await Promise.all([
       supabase
         .from("player_registrations")
         .select("*")
@@ -1836,9 +1838,16 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
         .eq("event_id", event.id)
         .order("created_at", { ascending: false })
         .limit(1),
+      loadEventSkillLevels(event.id, true),
     ]);
     setPlayers(data || []);
     setRequest(requests?.[0] || null);
+    setSkillLevels(levels);
+    setWalkIn((current) =>
+      levels.some((level) => level.is_active && level.code === current.skill_level)
+        ? current
+        : { ...current, skill_level: levels.find((level) => level.is_active)?.code || "beginner" },
+    );
     setLoading(false);
   }
   useEffect(() => {
@@ -1986,7 +1995,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
         player.full_name,
         player.email,
         player.phone || "",
-        skillLevelLabel(player.skill_level),
+        skillLevelLabel(player.skill_level, skillLevels),
         player.status,
         player.created_at,
       ]),
@@ -2096,7 +2105,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
         index + 1,
         player.full_name,
         player.email || player.phone || "—",
-        skillLevelLabel(player.skill_level),
+        skillLevelLabel(player.skill_level, skillLevels),
         label(player.status),
       ]),
       headStyles: { fillColor: green, textColor: 255, fontStyle: "bold" },
@@ -2131,7 +2140,13 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
     if (nameIndex < 0) return setMessage('The CSV must include a "Full Name" column.');
     const existingNames = new Set(players.map((player) => player.full_name.trim().toLowerCase()));
     const fileNames = new Set();
-    const allowedSkills = new Set(["novice", "beginner", "intermediate", "advanced", "competitive"]);
+    const skillAliases = new Map();
+    skillLevels.forEach((level) => {
+      skillAliases.set(level.code, level.code);
+      skillAliases.set(skillCodeFromName(level.name), level.code);
+    });
+    skillAliases.set("novice", "new_player");
+    skillAliases.set("competitive", "pro");
     const rows = parsed.slice(1).map((values, index) => {
       const full_name = (values[nameIndex] || "").trim();
       const email = emailIndex >= 0 ? (values[emailIndex] || "").trim() : "";
@@ -2139,13 +2154,14 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
       const importedSkill = skillIndex >= 0
         ? (values[skillIndex] || "beginner").trim().toLowerCase().replaceAll(" ", "_")
         : "beginner";
-      const skill = importedSkill === "new_player" ? "novice" : importedSkill;
+      const skill = skillAliases.get(importedSkill) || importedSkill;
       const key = full_name.toLowerCase();
       let error = "";
       if (!full_name) error = "Full name is required";
       else if (existingNames.has(key)) error = "Name already exists in this event";
       else if (fileNames.has(key)) error = "Duplicate name in file";
-      else if (!allowedSkills.has(skill)) error = "Invalid skill level";
+      else if (!skillLevels.some((level) => level.code === skill && level.is_active))
+        error = "Invalid or inactive skill level";
       else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) error = "Invalid email address";
       fileNames.add(key);
       return { row: index + 2, full_name, email, phone, skill_level: skill, error };
@@ -2198,6 +2214,9 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
         <div className="event-control-buttons">
           <button className="button button-secondary" onClick={onEdit}>
             <Edit3 size={16} /> Edit
+          </button>
+          <button className="button button-secondary" onClick={() => setShowSkillLevels(true)}>
+            <Settings2 size={16} /> Skill levels
           </button>
           {event.status === "open" ? (
             <button
@@ -2344,6 +2363,14 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           <input type="file" accept=".csv,text/csv" onChange={readImportFile} />
         </label>
       </div>
+      {showSkillLevels && (
+        <SkillLevelManager
+          eventId={event.id}
+          levels={skillLevels}
+          onChange={setSkillLevels}
+          onClose={() => setShowSkillLevels(false)}
+        />
+      )}
       <ContextualTour open={showPageTour} onClose={() => setShowPageTour(false)} storageKey="pickleflow-tour-players" steps={[
         { selector: '[data-tour="registration-control"]', title: "Control registration", text: "Edit the event or close and reopen public registration from this area." },
         { selector: '[data-tour="player-tools"]', title: "Find and manage players", text: "Search, filter, add walk-ins, import a CSV, or export your event information." },
@@ -2353,7 +2380,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
       ]} />
       {showImport && <section className="inline-panel import-panel">
         <div className="import-heading"><div><h3>Import player list</h3><p className="muted">Review the file before importing. Email and phone are optional.</p></div><button className="text-button compact" onClick={downloadImportTemplate}><Download size={15} /> Download template</button></div>
-        <div className="import-preview"><table className="player-table"><thead><tr><th>Row</th><th>Player</th><th>Contact</th><th>Skill</th><th>Validation</th></tr></thead><tbody>{importRows.map((row) => <tr key={row.row}><td>{row.row}</td><td><strong>{row.full_name || "Missing name"}</strong></td><td>{row.email || row.phone || "—"}</td><td className="capitalize">{skillLevelLabel(row.skill_level)}</td><td><span className={`import-status ${row.error ? "invalid" : "valid"}`}>{row.error || "Ready"}</span></td></tr>)}</tbody></table></div>
+        <div className="import-preview"><table className="player-table"><thead><tr><th>Row</th><th>Player</th><th>Contact</th><th>Skill</th><th>Validation</th></tr></thead><tbody>{importRows.map((row) => <tr key={row.row}><td>{row.row}</td><td><strong>{row.full_name || "Missing name"}</strong></td><td>{row.email || row.phone || "—"}</td><td className="capitalize">{skillLevelLabel(row.skill_level, skillLevels)}</td><td><span className={`import-status ${row.error ? "invalid" : "valid"}`}>{row.error || "Ready"}</span></td></tr>)}</tbody></table></div>
         <div className="dialog-actions"><button className="button button-secondary" onClick={() => { setShowImport(false); setImportRows([]); }} disabled={importing}>Cancel</button><button className="button button-secondary" onClick={downloadImportTemplate}><Download size={16} /> Template</button><button className="button button-primary" onClick={importPlayers} disabled={importing || !importRows.some((row) => !row.error)}><FileUp size={16} /> {importing ? "Importing…" : `Import ${importRows.filter((row) => !row.error).length} players`}</button></div>
       </section>}
       {showWalkIn && registrationOpen && (
@@ -2402,11 +2429,14 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
                   setWalkIn({ ...walkIn, skill_level: e.target.value })
                 }
               >
-                <option value="novice">New Player</option>
-                <option value="beginner">Beginner</option>
-                <option value="intermediate">Intermediate</option>
-                <option value="advanced">Advanced</option>
-                <option value="competitive">Competitive</option>
+                {skillLevels
+                  .filter((level) => level.is_active)
+                  .sort((a, b) => a.sort_order - b.sort_order)
+                  .map((level) => (
+                    <option key={level.id || level.code} value={level.code}>
+                      {level.name}
+                    </option>
+                  ))}
               </select>
             </label>
           </div>
@@ -2440,7 +2470,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
                     <strong>{player.full_name}</strong>
                   </td>
                   <td data-label="Skill level" className="capitalize">
-                    {skillLevelLabel(player.skill_level)}
+                    {skillLevelLabel(player.skill_level, skillLevels)}
                   </td>
                   <td data-label="Contact">
                     <div className="desktop-contact">
@@ -2907,7 +2937,8 @@ function PublicRegistration({ code, onHome }) {
     [form, setForm] = useState({ ...emptyPlayer, website: "" }),
     [message, setMessage] = useState(""),
     [success, setSuccess] = useState(false),
-    [loading, setLoading] = useState(true);
+    [loading, setLoading] = useState(true),
+    [skillLevels, setSkillLevels] = useState(DEFAULT_SKILL_LEVELS);
   useEffect(() => {
     supabase
       .from("events")
@@ -2922,6 +2953,13 @@ function PublicRegistration({ code, onHome }) {
             p_event_id: data.id,
           });
           setCount(result.data || 0);
+          const levels = await loadEventSkillLevels(data.id);
+          setSkillLevels(levels);
+          setForm((current) =>
+            levels.some((level) => level.is_active && level.code === current.skill_level)
+              ? current
+              : { ...current, skill_level: levels.find((level) => level.is_active)?.code || "beginner" },
+          );
         }
         setLoading(false);
       });
@@ -3106,11 +3144,14 @@ function PublicRegistration({ code, onHome }) {
                     setForm({ ...form, skill_level: e.target.value })
                   }
                 >
-                  <option value="novice">New Player</option>
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                  <option value="competitive">Competitive</option>
+                  {skillLevels
+                    .filter((level) => level.is_active)
+                    .sort((a, b) => a.sort_order - b.sort_order)
+                    .map((level) => (
+                      <option key={level.id || level.code} value={level.code}>
+                        {level.name}
+                      </option>
+                    ))}
                 </select>
               </label>
               {message && <div className="form-message error">{message}</div>}
