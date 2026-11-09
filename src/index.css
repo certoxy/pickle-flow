@@ -3202,11 +3202,22 @@ select:focus-visible {
   margin-top: 18px;
 }
 .court-access-item {
-  display: flex;
-  align-items: stretch;
-  gap: 6px;
+  display: grid;
+  gap: 7px;
+  flex: 1 1 310px;
+  padding: 8px;
+  border: 1px solid #dfe8ee;
+  border-radius: 13px;
+  background: #f9fbfc;
 }
+.court-access-controls { display:flex; align-items:stretch; gap:6px; }
 .court-access-item .court-chip { flex: 1; }
+.court-skill-settings { padding:0 4px 3px; }
+.court-skill-settings summary { color:var(--blue); cursor:pointer; font-size:.78rem; font-weight:800; line-height:1.35; }
+.court-skill-settings > small { display:block; margin-top:7px; color:var(--muted); font-size:.7rem; }
+.court-skill-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin-top:9px; }
+.court-skill-options label { display:flex; align-items:center; gap:7px; padding:7px 8px; border:1px solid #dfe8ee; border-radius:8px; background:#fff; color:var(--navy); font-size:.75rem; font-weight:700; }
+.court-skill-options input { width:auto; margin:0; }
 .court-link-button,.court-icon-button {
   width: 40px;
   border: 1px solid #d8e1e8;
