@@ -32,6 +32,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import QrScanner from "./QrScanner";
 import ContextualTour from "./ContextualTour";
 import {
+  canonicalSkillCode,
   DEFAULT_SKILL_LEVELS,
   loadEventSkillLevels,
   skillLevelLabel,
@@ -106,6 +107,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [editingCourtId, setEditingCourtId] = useState(null);
   const [editingCourtName, setEditingCourtName] = useState("");
   const [savingCourtName, setSavingCourtName] = useState(false);
+  const [savingCourtSkills, setSavingCourtSkills] = useState("");
   const [monitoredCourt, setMonitoredCourt] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [scores, setScores] = useState({});
@@ -407,9 +409,24 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const unassignedQueuedGames = activeGames
     .filter((game) => game.status === "queued" && !game.court_id)
     .sort((a, b) => a.game_number - b.game_number);
-  const courtCanAcceptMatch = (court) =>
+  const allowedSkillsForCourt = (court) => court.allowed_skill_levels || [];
+  const courtAllowsPlayer = (court, playerId) => {
+    const allowed = allowedSkillsForCourt(court);
+    if (!allowed.length) return true;
+    return allowed.includes(canonicalSkillCode(
+      players.find((player) => player.id === playerId)?.skill_level,
+    ));
+  };
+  const gamePlayerIds = (game) =>
+    gamePlayers
+      .filter((entry) => entry.game_id === game.id)
+      .map((entry) => entry.player_registration_id);
+  const courtAllowsGame = (court, game) =>
+    gamePlayerIds(game).every((playerId) => courtAllowsPlayer(court, playerId));
+  const courtCanAcceptMatch = (court, game = null) =>
     court.status === "available" &&
-    !activeGames.some((game) => game.court_id === court.id);
+    !activeGames.some((activeGame) => activeGame.court_id === court.id) &&
+    (!game || courtAllowsGame(court, game));
   const isNextMatch = (game) =>
     game.status === "queued" && !game.court_id;
   const eventEnded = event.status === "completed";
@@ -747,9 +764,17 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .sort((first, second) => first.score - second.score)[0].ids;
   }
 
-  function fairNextPlayerIds() {
+  function fairNextPlayerIds(allowedSkillCodes = []) {
     const now = Date.now();
     const ranked = waiting
+      .filter((entry) =>
+        !allowedSkillCodes.length ||
+        allowedSkillCodes.includes(
+          canonicalSkillCode(players.find(
+            (player) => player.id === entry.player_registration_id,
+          )?.skill_level),
+        ),
+      )
       .map((entry, queueIndex) => ({
         id: entry.player_registration_id,
         gamesPlayed: playerGameCounts.get(entry.player_registration_id) || 0,
@@ -879,9 +904,17 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     )
       return;
     if (waiting.length < playersNeeded) return;
+    const matchCandidate = courts
+      .filter((court) => courtCanAcceptMatch(court))
+      .map((court) => ({
+        court,
+        playerIds: fairNextPlayerIds(allowedSkillsForCourt(court)),
+      }))
+      .find((candidate) => candidate.playerIds.length === playersNeeded);
+    if (!matchCandidate) return;
     setAutoAssigning(true);
     createMatchFor(
-      fairNextPlayerIds(),
+      matchCandidate.playerIds,
       true,
     ).finally(() => setAutoAssigning(false));
   }, [
@@ -897,10 +930,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   useEffect(() => {
     if (eventEnded || autoPlacingMatch || !unassignedQueuedGames.length) return;
-    const court = courts.find(courtCanAcceptMatch);
+    const pendingGame = unassignedQueuedGames[0];
+    const court = courts.find((item) => courtCanAcceptMatch(item, pendingGame));
     if (!court) return;
     setAutoPlacingMatch(true);
-    assignMatchToCourt(unassignedQueuedGames[0], court).finally(() =>
+    assignMatchToCourt(pendingGame, court).finally(() =>
       setAutoPlacingMatch(false),
     );
   }, [courts, games, autoPlacingMatch, eventEnded]);
@@ -1060,6 +1094,52 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       setScoringLink({ ...scoringLink, court: { ...scoringLink.court, name } });
     cancelCourtRename();
     setMessage(`Court renamed to ${name}.`);
+  }
+
+  async function updateCourtSkillLevels(court, skillCode) {
+    if (savingCourtSkills) return;
+    const current = allowedSkillsForCourt(court);
+    const allowedSkillLevels = current.includes(skillCode)
+      ? current.filter((code) => code !== skillCode)
+      : [...current, skillCode];
+    setSavingCourtSkills(court.id);
+    setMessage("");
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "update_court_skills", {
+        courtId: court.id,
+        allowedSkillLevels,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setCourts((items) =>
+        items.map((item) =>
+          item.id === court.id
+            ? { ...item, allowed_skill_levels: allowedSkillLevels }
+            : item,
+        ),
+      );
+      setSavingCourtSkills("");
+      setMessage(`Offline · ${court.name} skill rotation updated.`);
+      return;
+    }
+    const { error } = await supabase
+      .from("event_courts")
+      .update({ allowed_skill_levels: allowedSkillLevels })
+      .eq("id", court.id)
+      .eq("event_id", event.id);
+    setSavingCourtSkills("");
+    if (error) return setMessage(error.message);
+    setCourts((items) =>
+      items.map((item) =>
+        item.id === court.id
+          ? { ...item, allowed_skill_levels: allowedSkillLevels }
+          : item,
+      ),
+    );
+    setMessage(
+      allowedSkillLevels.length
+        ? `${court.name} now accepts ${allowedSkillLevels.length} skill ${allowedSkillLevels.length === 1 ? "level" : "levels"}.`
+        : `${court.name} is open to all skill levels.`,
+    );
   }
 
   async function openScoringLink(court) {
@@ -1371,6 +1451,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   async function assignMatchToCourt(game, court) {
+    if (!courtAllowsGame(court, game)) {
+      setMessage(
+        `${court.name} does not accept every player skill level in Game ${game.game_number}.`,
+      );
+      return false;
+    }
     if (
       activeGames.some(
         (item) => item.id !== game.id && item.court_id === court.id,
@@ -1441,6 +1527,18 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     }
     if (playerIds.length !== playersNeeded) {
       setMessage(`Select exactly ${playersNeeded} players.`);
+      return false;
+    }
+    if (
+      !courts.some(
+        (court) =>
+          court.status !== "disabled" &&
+          playerIds.every((playerId) => courtAllowsPlayer(court, playerId)),
+      )
+    ) {
+      setMessage(
+        "These players do not share an eligible court. Adjust the player selection or the court skill settings.",
+      );
       return false;
     }
     if (unassignedQueuedGames.length) {
@@ -1768,15 +1866,33 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         )
         .map((entry) => entry.player_registration_id),
     );
-    return checkedIn.filter(
-      (player) =>
+    const otherGamePlayerIds = gamePlayerIds(game);
+    return checkedIn.filter((player) => {
+      const candidatePlayerIds = [
+        ...otherGamePlayerIds.filter(
+          (playerId) => playerId !== substitutionPrompt?.slot.player_registration_id,
+        ),
+        player.id,
+      ];
+      const eligibleCourt = game.court_id
+        ? courts.find((court) => court.id === game.court_id)
+        : courts.find(
+            (court) =>
+              court.status !== "disabled" &&
+              candidatePlayerIds.every((playerId) =>
+                courtAllowsPlayer(court, playerId),
+              ),
+          );
+      return (
         !activePlayerIds.has(player.id) &&
         !gamePlayers.some(
           (entry) =>
             entry.game_id === game.id &&
             entry.player_registration_id === player.id,
-        ),
-    );
+        ) &&
+        Boolean(eligibleCourt)
+      );
+    });
   }
 
   function openSubstitution(game, slot) {
@@ -1876,6 +1992,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           .from("events")
           .update(payload.payload)
           .eq("id", event.id));
+      } else if (type === "update_court_skills") {
+        ({ error } = await supabase
+          .from("event_courts")
+          .update({ allowed_skill_levels: payload.allowedSkillLevels })
+          .eq("id", payload.courtId)
+          .eq("event_id", event.id));
       } else if (type === "add_player") {
         ({ error } = await supabase
           .from("player_registrations")
@@ -2844,7 +2966,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             <div className="court-list">
               {courts.map((court) => (
                 <div className="court-access-item" key={court.id}>
-                  {editingCourtId === court.id ? <form className="court-rename-form" onSubmit={(e) => renameCourt(e, court)}>
+                  <div className="court-access-controls">{editingCourtId === court.id ? <form className="court-rename-form" onSubmit={(e) => renameCourt(e, court)}>
                     <input autoFocus required aria-label={`Rename ${court.name}`} value={editingCourtName} onChange={(e) => setEditingCourtName(e.target.value)} maxLength="80" />
                     <button type="submit" className="court-icon-button save" disabled={savingCourtName || !editingCourtName.trim()} aria-label="Save court name" title="Save"><Check size={17} /></button>
                     <button type="button" className="court-icon-button" onClick={cancelCourtRename} disabled={savingCourtName} aria-label="Cancel court rename" title="Cancel"><X size={17} /></button>
@@ -2855,7 +2977,30 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                     <button className="court-icon-button" onClick={() => beginCourtRename(court)} aria-label={`Edit ${court.name} name`} title="Edit court name"><Edit3 size={17} /></button>
                     <button className="court-link-button" data-tour="scoring-link" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
                     {directConnections[court.id] && <span className={`direct-court-status ${directConnections[court.id]}`} title="Direct device sync"><Radio size={13} />{directConnections[court.id] === "connected" ? "Direct" : "Pairing"}</span>}
-                  </>}
+                  </>}</div>
+                  <details className="court-skill-settings">
+                    <summary>
+                      Skills: {allowedSkillsForCourt(court).length
+                        ? allowedSkillsForCourt(court)
+                            .map((code) => skillLevelLabel(code, skillLevels))
+                            .join(", ")
+                        : "All skill levels"}
+                    </summary>
+                    <div className="court-skill-options">
+                      {skillLevels.filter((level) => level.is_active).map((level) => (
+                        <label key={level.code}>
+                          <input
+                            type="checkbox"
+                            checked={allowedSkillsForCourt(court).includes(level.code)}
+                            disabled={savingCourtSkills === court.id || court.status === "in_use"}
+                            onChange={() => updateCourtSkillLevels(court, level.code)}
+                          />
+                          <span>{level.name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <small>Leave every skill unchecked to allow all players.</small>
+                  </details>
                 </div>
               ))}
               {!courts.length && (
