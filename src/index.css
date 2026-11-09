@@ -3218,6 +3218,18 @@ select:focus-visible {
 .court-skill-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; margin-top:9px; }
 .court-skill-options label { display:flex; align-items:center; gap:7px; padding:7px 8px; border:1px solid #dfe8ee; border-radius:8px; background:#fff; color:var(--navy); font-size:.75rem; font-weight:700; }
 .court-skill-options input { width:auto; margin:0; }
+.category-help { margin:-2px 0 10px; font-size:.82rem; }
+.category-manager-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin:12px 0 18px; }
+.category-manager-card { padding:12px; border:1px solid #dfe8ee; border-radius:12px; background:#f9fbfc; }
+.category-manager-card > strong { color:var(--navy); }
+.category-skill-list { display:grid; gap:5px; margin-top:9px; }
+.category-skill-list label { display:flex; align-items:center; gap:7px; padding:6px 8px; border-radius:8px; background:#fff; color:var(--navy); font-size:.76rem; font-weight:700; }
+.category-skill-list input { width:auto; margin:0; }
+.court-category-select { display:grid; gap:5px; padding:0 4px 3px; color:var(--muted); font-size:.72rem; font-weight:800; }
+.court-category-select select { margin:0; padding:8px 10px; background:#fff; }
+.category-ranking-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.category-ranking-heading h3 { margin:0; }
+.category-ranking-heading select { width:auto; min-width:160px; margin:0; }
 .court-link-button,.court-icon-button {
   width: 40px;
   border: 1px solid #d8e1e8;
