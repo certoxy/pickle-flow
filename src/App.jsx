@@ -1800,6 +1800,8 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
     [showImport, setShowImport] = useState(false),
     [showSkillLevels, setShowSkillLevels] = useState(false),
     [skillLevels, setSkillLevels] = useState(DEFAULT_SKILL_LEVELS),
+    [editingPlayer, setEditingPlayer] = useState(null),
+    [savingPlayer, setSavingPlayer] = useState(false),
     [importRows, setImportRows] = useState([]),
     [importing, setImporting] = useState(false);
   useEffect(() => {
@@ -1865,6 +1867,45 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           item.id === player.id ? { ...item, status } : item,
         ),
       );
+  }
+  async function savePlayerDetails(e) {
+    e.preventDefault();
+    if (!editingPlayer || savingPlayer) return;
+    const fullName = editingPlayer.full_name.trim();
+    if (
+      players.some(
+        (player) =>
+          player.id !== editingPlayer.id &&
+          player.full_name.trim().toLowerCase() === fullName.toLowerCase() &&
+          player.status !== "cancelled",
+      )
+    ) {
+      setMessage("Another active player already uses that name.");
+      return;
+    }
+    setSavingPlayer(true);
+    setMessage("");
+    const updates = {
+      full_name: fullName,
+      email: editingPlayer.email?.trim() || null,
+      phone: editingPlayer.phone?.trim() || null,
+      skill_level: editingPlayer.skill_level,
+    };
+    const { data, error } = await supabase
+      .from("player_registrations")
+      .update(updates)
+      .eq("id", editingPlayer.id)
+      .eq("event_id", event.id)
+      .select()
+      .single();
+    setSavingPlayer(false);
+    if (error) {
+      setMessage(error.code === "23505" ? "Another player already uses those details." : error.message);
+      return;
+    }
+    setPlayers((current) => current.map((player) => player.id === data.id ? data : player));
+    setEditingPlayer(null);
+    setMessage(`${data.full_name}'s details were updated.`);
   }
   async function addWalkIn(e) {
     e.preventDefault();
@@ -2443,6 +2484,13 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
           <button className="button button-primary">Add player</button>
         </form>
       )}
+      {editingPlayer && <div className="modal-backdrop"><form className="game-complete-dialog player-edit-dialog" onSubmit={savePlayerDetails} role="dialog" aria-modal="true" aria-labelledby="edit-player-title">
+        <span className="eyebrow">Player details</span>
+        <h2 id="edit-player-title">Edit player</h2>
+        <div className="form-row"><label>Full name<input required maxLength="120" value={editingPlayer.full_name} onChange={(e) => setEditingPlayer({ ...editingPlayer, full_name: e.target.value })} /></label><label>Skill level<select value={editingPlayer.skill_level} onChange={(e) => setEditingPlayer({ ...editingPlayer, skill_level: e.target.value })}>{skillLevels.filter((level) => level.is_active || level.code === editingPlayer.skill_level).sort((a,b) => a.sort_order - b.sort_order).map((level) => <option key={level.id || level.code} value={level.code}>{level.name}</option>)}</select></label></div>
+        <div className="form-row"><label>Email <span>(optional)</span><input type="email" value={editingPlayer.email || ""} onChange={(e) => setEditingPlayer({ ...editingPlayer, email: e.target.value })} /></label><label>Phone <span>(optional)</span><input value={editingPlayer.phone || ""} onChange={(e) => setEditingPlayer({ ...editingPlayer, phone: e.target.value })} /></label></div>
+        <div className="dialog-actions"><button type="button" className="button button-secondary" onClick={() => setEditingPlayer(null)} disabled={savingPlayer}>Cancel</button><button className="button button-primary" disabled={savingPlayer || !editingPlayer.full_name.trim()}>{savingPlayer ? "Saving…" : "Save changes"}</button></div>
+      </form></div>}
       {message && <div className="form-message">{message}</div>}
       {loading ? (
         <p>Loading players…</p>
@@ -2461,6 +2509,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
                 <th>Skill level</th>
                 <th>Contact</th>
                 <th>Status</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -2499,6 +2548,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
                       <option value="cancelled">Cancelled</option>
                     </select>
                   </td>
+                  <td data-label="Actions"><button type="button" className="button button-secondary compact" onClick={() => { setMessage(""); setEditingPlayer({ ...player }); }}><Edit3 size={15} /> Edit</button></td>
                 </tr>
               ))}
             </tbody>
