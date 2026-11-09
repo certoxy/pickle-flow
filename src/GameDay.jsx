@@ -38,6 +38,7 @@ import {
   skillLevelLabel,
   skillLevelRating,
 } from "./lib/skillLevels";
+import { loadPlayerCategories } from "./lib/playerCategories";
 import { supabase } from "./lib/supabase";
 import {
   acknowledgePendingScore,
@@ -103,11 +104,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [games, setGames] = useState([]);
   const [gamePlayers, setGamePlayers] = useState([]);
   const [skillLevels, setSkillLevels] = useState(DEFAULT_SKILL_LEVELS);
+  const [playerCategories, setPlayerCategories] = useState([]);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
+  const [rankingCategoryId, setRankingCategoryId] = useState("");
   const [courtName, setCourtName] = useState("");
   const [editingCourtId, setEditingCourtId] = useState(null);
   const [editingCourtName, setEditingCourtName] = useState("");
   const [savingCourtName, setSavingCourtName] = useState(false);
-  const [savingCourtSkills, setSavingCourtSkills] = useState("");
   const [monitoredCourt, setMonitoredCourt] = useState("");
   const [selectedPlayers, setSelectedPlayers] = useState([]);
   const [scores, setScores] = useState({});
@@ -172,6 +176,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         setGamePlayers(cached.gamePlayers || []);
         setScores(cached.scores || {});
         setSkillLevels(cached.skillLevels || DEFAULT_SKILL_LEVELS);
+        setPlayerCategories(cached.playerCategories || []);
+        setRankingCategoryId(cached.playerCategories?.[0]?.id || "");
         setPendingScoreCount(pendingScoresForEvent(event.id).length);
         setPendingOperationCount(pendingGameDayOperations(event.id).length);
         setMessage("Offline Game Day restored from this browser.");
@@ -181,7 +187,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       setLoading(false);
       return;
     }
-    const [playerResult, courtResult, queueResult, gameResult, loadedSkillLevels] =
+    const [playerResult, courtResult, queueResult, gameResult, loadedSkillLevels, loadedCategories] =
       await Promise.all([
         supabase
           .from("player_registrations")
@@ -206,6 +212,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           .eq("event_id", event.id)
           .order("game_number", { ascending: false }),
         loadEventSkillLevels(event.id, true),
+        loadPlayerCategories(event.id),
       ]);
     const normalized = normalizeCourtAssignments(gameResult.data || []);
     const loadedGames = normalized.games;
@@ -224,6 +231,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setGames(loadedGames);
     setGamePlayers(participantResult.data || []);
     setSkillLevels(loadedSkillLevels);
+    setPlayerCategories(loadedCategories);
+    setRankingCategoryId((current) =>
+      loadedCategories.some((category) => category.id === current)
+        ? current
+        : loadedCategories[0]?.id || "",
+    );
     setNewPlayer((current) =>
       loadedSkillLevels.some((level) => level.is_active && level.code === current.skill_level)
         ? current
@@ -271,8 +284,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       gamePlayers,
       scores,
       skillLevels,
+      playerCategories,
     });
-  }, [event.id, gamePlayers, games, loading, players, queue, scores, courts, skillLevels]);
+  }, [event.id, gamePlayers, games, loading, players, queue, scores, courts, skillLevels, playerCategories]);
 
   useEffect(() => {
     courtDataRef.current = { players, gamePlayers, scores };
@@ -409,10 +423,15 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const unassignedQueuedGames = activeGames
     .filter((game) => game.status === "queued" && !game.court_id)
     .sort((a, b) => a.game_number - b.game_number);
-  const allowedSkillsForCourt = (court) => court.allowed_skill_levels || [];
+  const allowedSkillsForCourt = (court) => {
+    if (!court.category_id) return null;
+    return skillLevels
+      .filter((level) => level.category_id === court.category_id && level.is_active)
+      .map((level) => level.code);
+  };
   const courtAllowsPlayer = (court, playerId) => {
     const allowed = allowedSkillsForCourt(court);
-    if (!allowed.length) return true;
+    if (allowed === null) return true;
     return allowed.includes(canonicalSkillCode(
       players.find((player) => player.id === playerId)?.skill_level,
     ));
@@ -494,6 +513,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           }, 0);
           return {
             ...player,
+            category_id:
+              skillLevels.find(
+                (level) => canonicalSkillCode(level.code) === canonicalSkillCode(player.skill_level),
+              )?.category_id || null,
             played: appearances.length,
             wins,
             losses: appearances.length - wins,
@@ -509,11 +532,18 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             a.losses - b.losses ||
             a.full_name.localeCompare(b.full_name),
         ),
-    [checkedIn, completedGames, gamePlayers],
+    [checkedIn, completedGames, gamePlayers, skillLevels],
+  );
+  const categoryStandings = useMemo(
+    () => standings.filter((player) => player.category_id === rankingCategoryId),
+    [standings, rankingCategoryId],
+  );
+  const rankingCategory = playerCategories.find(
+    (category) => category.id === rankingCategoryId,
   );
   const topWinPercentage = useMemo(
     () =>
-      [...standings]
+      [...categoryStandings]
         .filter((player) => player.played > 0)
         .sort(
           (a, b) =>
@@ -524,11 +554,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             a.full_name.localeCompare(b.full_name),
         )
         .slice(0, 5),
-    [standings],
+    [categoryStandings],
   );
   const topAccumulatedScore = useMemo(
     () =>
-      [...standings]
+      [...categoryStandings]
         .filter((player) => player.played > 0)
         .sort(
           (a, b) =>
@@ -538,12 +568,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             a.full_name.localeCompare(b.full_name),
         )
         .slice(0, 5),
-    [standings],
+    [categoryStandings],
   );
   const championship = useMemo(() => {
-    const maxGames = Math.max(0, ...standings.map((player) => player.played));
+    const maxGames = Math.max(0, ...categoryStandings.map((player) => player.played));
     const minimumGames = officialGamesTarget || Math.max(1, maxGames - 1);
-    const eligible = standings
+    const eligible = categoryStandings
       .filter(
         (player) =>
           player.played >= minimumGames &&
@@ -570,7 +600,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         )
       : [];
     return { champions, minimumGames, maxGames };
-  }, [standings, officialGamesTarget, event.equalization_roster]);
+  }, [categoryStandings, officialGamesTarget, event.equalization_roster]);
   const completedGameIds = useMemo(
     () => new Set(completedGames.map((game) => game.id)),
     [completedGames],
@@ -764,11 +794,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .sort((first, second) => first.score - second.score)[0].ids;
   }
 
-  function fairNextPlayerIds(allowedSkillCodes = []) {
+  function fairNextPlayerIds(allowedSkillCodes = null) {
     const now = Date.now();
     const ranked = waiting
       .filter((entry) =>
-        !allowedSkillCodes.length ||
+        allowedSkillCodes === null ||
         allowedSkillCodes.includes(
           canonicalSkillCode(players.find(
             (player) => player.id === entry.player_registration_id,
@@ -1037,7 +1067,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setMessage("");
     const { data, error } = await supabase
       .from("event_courts")
-      .insert({ event_id: event.id, name: courtName.trim() })
+      .insert({
+        event_id: event.id,
+        name: courtName.trim(),
+        category_id: playerCategories[0]?.id || null,
+      })
       .select()
       .single();
     if (error) setMessage(error.message);
@@ -1096,50 +1130,69 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setMessage(`Court renamed to ${name}.`);
   }
 
-  async function updateCourtSkillLevels(court, skillCode) {
-    if (savingCourtSkills) return;
-    const current = allowedSkillsForCourt(court);
-    const allowedSkillLevels = current.includes(skillCode)
-      ? current.filter((code) => code !== skillCode)
-      : [...current, skillCode];
-    setSavingCourtSkills(court.id);
+  async function addPlayerCategory(e) {
+    e.preventDefault();
+    const name = newCategoryName.trim();
+    if (!name || savingCategory || !navigator.onLine) return;
+    setSavingCategory(true);
     setMessage("");
+    const { data, error } = await supabase
+      .from("event_player_categories")
+      .insert({
+        event_id: event.id,
+        name,
+        sort_order: (playerCategories.length + 1) * 10,
+      })
+      .select()
+      .single();
+    setSavingCategory(false);
+    if (error) return setMessage(error.code === "23505" ? "That category name already exists." : error.message);
+    setPlayerCategories((current) => [...current, data]);
+    setNewCategoryName("");
+    setMessage(`${name} category created. Assign one or more skill levels below.`);
+  }
+
+  async function assignSkillToCategory(skill, categoryId) {
     if (!navigator.onLine) {
-      enqueueGameDayOperation(event.id, "update_court_skills", {
+      setMessage("Connect to the internet to reorganize player categories.");
+      return;
+    }
+    setMessage("");
+    const { error } = await supabase
+      .from("event_skill_levels")
+      .update({ category_id: categoryId || null })
+      .eq("id", skill.id)
+      .eq("event_id", event.id);
+    if (error) return setMessage(error.message);
+    setSkillLevels((levels) =>
+      levels.map((level) =>
+        level.id === skill.id ? { ...level, category_id: categoryId || null } : level,
+      ),
+    );
+  }
+
+  async function updateCourtCategory(court, categoryId) {
+    setMessage("");
+    const payload = { category_id: categoryId || null };
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "update_court_category", {
         courtId: court.id,
-        allowedSkillLevels,
+        categoryId: categoryId || null,
       });
       setPendingOperationCount(pendingGameDayOperations(event.id).length);
-      setCourts((items) =>
-        items.map((item) =>
-          item.id === court.id
-            ? { ...item, allowed_skill_levels: allowedSkillLevels }
-            : item,
-        ),
-      );
-      setSavingCourtSkills("");
-      setMessage(`Offline · ${court.name} skill rotation updated.`);
+      setCourts((items) => items.map((item) => item.id === court.id ? { ...item, ...payload } : item));
+      setMessage(`Offline · ${court.name} category updated.`);
       return;
     }
     const { error } = await supabase
       .from("event_courts")
-      .update({ allowed_skill_levels: allowedSkillLevels })
+      .update(payload)
       .eq("id", court.id)
       .eq("event_id", event.id);
-    setSavingCourtSkills("");
     if (error) return setMessage(error.message);
-    setCourts((items) =>
-      items.map((item) =>
-        item.id === court.id
-          ? { ...item, allowed_skill_levels: allowedSkillLevels }
-          : item,
-      ),
-    );
-    setMessage(
-      allowedSkillLevels.length
-        ? `${court.name} now accepts ${allowedSkillLevels.length} skill ${allowedSkillLevels.length === 1 ? "level" : "levels"}.`
-        : `${court.name} is open to all skill levels.`,
-    );
+    setCourts((items) => items.map((item) => item.id === court.id ? { ...item, ...payload } : item));
+    const categoryName = playerCategories.find((category) => category.id === categoryId)?.name;
+    setMessage(`${court.name} is assigned to ${categoryName || "all players"}.`);
   }
 
   async function openScoringLink(court) {
@@ -1773,7 +1826,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     const eventTitle = event.name.length > 48 ? `${event.name.slice(0, 45)}…` : event.name;
     context.fillText(eventTitle, 80, 250);
     context.font = "600 23px Manrope, Arial, sans-serif";
-    context.fillText("Final standings · Generated by PickleFlow", 80, 292);
+    context.fillText(`${rankingCategory?.name || "All Players"} · Final standings · Generated by PickleFlow`, 80, 292);
     leaders.forEach((player, index) => {
       const y = 355 + index * (isChampion ? 205 : 145);
       context.fillStyle = index === 0 ? "rgba(169,231,47,.22)" : "rgba(255,255,255,.11)";
@@ -1996,6 +2049,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         ({ error } = await supabase
           .from("event_courts")
           .update({ allowed_skill_levels: payload.allowedSkillLevels })
+          .eq("id", payload.courtId)
+          .eq("event_id", event.id));
+      } else if (type === "update_court_category") {
+        ({ error } = await supabase
+          .from("event_courts")
+          .update({ category_id: payload.categoryId })
           .eq("id", payload.courtId)
           .eq("event_id", event.id));
       } else if (type === "add_player") {
@@ -2951,6 +3010,27 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 </span>
               </div>
             )}
+            <h3 className="subheading">Player categories</h3>
+            <p className="muted category-help">Each skill belongs to one category. Moving a skill here automatically removes it from its previous category.</p>
+            <form className="court-form" onSubmit={addPlayerCategory}>
+              <input required maxLength="50" placeholder="New category name" value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} />
+              <button className="button button-primary" disabled={savingCategory || !navigator.onLine}><Plus size={16} /> Add category</button>
+            </form>
+            <div className="category-manager-grid">
+              {playerCategories.map((category) => (
+                <article className="category-manager-card" key={category.id}>
+                  <strong>{category.name}</strong>
+                  <div className="category-skill-list">
+                    {skillLevels.filter((level) => level.is_active).map((level) => (
+                      <label key={level.id || level.code}>
+                        <input type="checkbox" checked={level.category_id === category.id} onChange={() => assignSkillToCategory(level, category.id)} />
+                        <span>{level.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
             <h3 className="subheading">Courts</h3>
             <form className="court-form" data-tour="add-court" onSubmit={addCourt}>
               <input
@@ -2978,29 +3058,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                     <button className="court-link-button" data-tour="scoring-link" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
                     {directConnections[court.id] && <span className={`direct-court-status ${directConnections[court.id]}`} title="Direct device sync"><Radio size={13} />{directConnections[court.id] === "connected" ? "Direct" : "Pairing"}</span>}
                   </>}</div>
-                  <details className="court-skill-settings">
-                    <summary>
-                      Skills: {allowedSkillsForCourt(court).length
-                        ? allowedSkillsForCourt(court)
-                            .map((code) => skillLevelLabel(code, skillLevels))
-                            .join(", ")
-                        : "All skill levels"}
-                    </summary>
-                    <div className="court-skill-options">
-                      {skillLevels.filter((level) => level.is_active).map((level) => (
-                        <label key={level.code}>
-                          <input
-                            type="checkbox"
-                            checked={allowedSkillsForCourt(court).includes(level.code)}
-                            disabled={savingCourtSkills === court.id || court.status === "in_use"}
-                            onChange={() => updateCourtSkillLevels(court, level.code)}
-                          />
-                          <span>{level.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                    <small>Leave every skill unchecked to allow all players.</small>
-                  </details>
+                  <label className="court-category-select">Player category
+                    <select value={court.category_id || ""} disabled={court.status === "in_use"} onChange={(e) => updateCourtCategory(court, e.target.value)}>
+                      <option value="">All players</option>
+                      {playerCategories.filter((category) => category.is_active).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                    </select>
+                  </label>
                 </div>
               ))}
               {!courts.length && (
@@ -3116,9 +3179,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       ]} />
       <div className="game-day-grid game-day-results">
         <section className="profile-card">
-          <h3>
-            <Trophy size={19} /> Event standings
-          </h3>
+          <div className="category-ranking-heading"><h3><Trophy size={19} /> Event standings</h3><select aria-label="Standings category" value={rankingCategoryId} onChange={(e) => setRankingCategoryId(e.target.value)}>{playerCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
           <div className="player-table-wrap">
             <table className="player-table">
               <thead>
@@ -3133,7 +3194,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 </tr>
               </thead>
               <tbody>
-                {standings.map((player, index) => (
+                {categoryStandings.map((player, index) => (
                   <tr key={player.id}>
                     <td>{index + 1}</td>
                     <td>
@@ -3146,6 +3207,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                     <td><strong>{player.accumulatedScore}</strong></td>
                   </tr>
                 ))}
+                {!categoryStandings.length && <tr><td colSpan="7" className="muted">No checked-in players are assigned to this category.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -3177,7 +3239,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           </div>
         </section>
       <section className="leaderboard-section">
-        <div className="leaderboard-heading"><div><span className="eyebrow"><Trophy size={15} /> Player highlights</span><h2>Champion & Top 5 leaderboards</h2></div><p>Updated from completed game results.</p></div>
+        <div className="leaderboard-heading"><div><span className="eyebrow"><Trophy size={15} /> Player highlights · {rankingCategory?.name || "Category"}</span><h2>Champion & Top 5 leaderboards</h2></div><p>Each category has its own rankings.</p></div>
         <article className={`overall-champion-card ${championship.champions.length > 1 ? "tied" : ""}`}>
           <div className="champion-crown"><Crown /></div>
           <div className="champion-copy">
