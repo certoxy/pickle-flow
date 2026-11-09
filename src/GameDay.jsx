@@ -447,6 +447,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     court.accepting_matches !== false &&
     !activeGames.some((activeGame) => activeGame.court_id === court.id) &&
     (!game || courtAllowsGame(court, game));
+  const courtCanQueueFutureMatch = (court) =>
+    court.status !== "disabled" && court.accepting_matches !== false;
   const isNextMatch = (game) =>
     game.status === "queued" && !game.court_id;
   const eventEnded = event.status === "completed";
@@ -936,7 +938,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       return;
     if (waiting.length < playersNeeded) return;
     const matchCandidate = courts
-      .filter((court) => courtCanAcceptMatch(court))
+      .filter(courtCanQueueFutureMatch)
       .map((court) => ({
         court,
         playerIds: fairNextPlayerIds(allowedSkillsForCourt(court)),
