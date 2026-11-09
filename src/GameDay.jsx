@@ -431,6 +431,11 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .filter((entry) => activeGames.some((game) => game.id === entry.game_id))
       .map((entry) => entry.player_registration_id),
   );
+  const visibleDashboardCourts = courts.filter(
+    (court) =>
+      court.accepting_matches !== false ||
+      activeGames.some((game) => game.court_id === court.id),
+  );
   const availableCheckedInNotQueued = checkedIn.filter(
     (player) =>
       !activePlayerIds.has(player.id) &&
@@ -2746,10 +2751,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           <span>Completed</span>
         </div>
       </div>
-      {courts.length > 0 && <section className="court-overview" data-tour="court-overview" aria-label="Court overview">
+      {visibleDashboardCourts.length > 0 && <section className="court-overview" data-tour="court-overview" aria-label="Court overview">
         <div className="court-overview-heading"><strong>Court overview</strong><button type="button" onClick={() => setMonitoredCourt("")} className={!monitoredCourt ? "selected" : ""}>View all matches</button></div>
         <div className="court-overview-list">
-          {courts.filter((court) => court.status !== "disabled").map((court) => {
+          {visibleDashboardCourts.filter((court) => court.status !== "disabled").map((court) => {
             const liveGame = playingGameForCourt(court.id);
             const readyGame = activeGames.find((game) => game.court_id === court.id && game.status === "queued");
             const liveScore = liveGame ? scores[liveGame.id] || { one: liveGame.team_one_score || 0, two: liveGame.team_two_score || 0 } : null;
@@ -2889,7 +2894,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               onChange={(e) => setMonitoredCourt(e.target.value)}
             >
               <option value="">All courts</option>
-              {courts.map((court) => (
+              {visibleDashboardCourts.map((court) => (
                 <option key={court.id} value={court.id}>
                   {court.name}
                 </option>
