@@ -441,6 +441,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .filter((entry) => entry.game_id === game.id)
       .map((entry) => entry.player_registration_id);
   const courtAllowsGame = (court, game) => {
+    if (game.category_id)
+      return Boolean(court.category_id) && court.category_id === game.category_id;
     const playerIds = gamePlayerIds(game);
     return (
       playerIds.length === playersNeeded &&
@@ -1610,6 +1612,25 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       setMessage(`Select exactly ${playersNeeded} players.`);
       return false;
     }
+    const selectedCategoryIds = [
+      ...new Set(
+        playerIds
+          .map((playerId) => {
+            const player = players.find((item) => item.id === playerId);
+            return skillLevels.find(
+              (level) =>
+                canonicalSkillCode(level.code) ===
+                canonicalSkillCode(player?.skill_level),
+            )?.category_id;
+          })
+          .filter(Boolean),
+      ),
+    ];
+    if (selectedCategoryIds.length > 1) {
+      setMessage("All players in a match must belong to the same player category.");
+      return false;
+    }
+    const matchCategoryId = selectedCategoryIds[0] || null;
     if (
       !courts.some(
         (court) =>
@@ -1657,6 +1678,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         id: crypto.randomUUID(),
         event_id: event.id,
         court_id: null,
+        category_id: matchCategoryId,
         game_number: gameNumber,
         format: event.game_format,
         points_to_win: event.points_to_win,
@@ -1702,6 +1724,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .insert({
         event_id: event.id,
         court_id: null,
+        category_id: matchCategoryId,
         game_number: gameNumber,
         format: event.game_format,
         points_to_win: event.points_to_win,
