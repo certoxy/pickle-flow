@@ -440,8 +440,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     gamePlayers
       .filter((entry) => entry.game_id === game.id)
       .map((entry) => entry.player_registration_id);
-  const courtAllowsGame = (court, game) =>
-    gamePlayerIds(game).every((playerId) => courtAllowsPlayer(court, playerId));
+  const courtAllowsGame = (court, game) => {
+    const playerIds = gamePlayerIds(game);
+    return (
+      playerIds.length === playersNeeded &&
+      playerIds.every((playerId) => courtAllowsPlayer(court, playerId))
+    );
+  };
   const courtCanAcceptMatch = (court, game = null) =>
     court.status === "available" &&
     court.accepting_matches !== false &&
@@ -970,7 +975,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     assignMatchToCourt(pendingGame, court).finally(() =>
       setAutoPlacingMatch(false),
     );
-  }, [courts, games, autoPlacingMatch, eventEnded]);
+  }, [courts, games, gamePlayers, players, skillLevels, autoPlacingMatch, eventEnded]);
 
   async function updateEventSettings(field, value) {
     const payload = {
