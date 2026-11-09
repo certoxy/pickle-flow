@@ -1152,11 +1152,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .eq("id", court.id);
     if (error) setMessage(error.message);
     else {
-      setCourts(
-        courts.map((item) =>
+      setCourts((items) =>
+        items.map((item) =>
           item.id === court.id ? { ...item, ...payload } : item,
         ),
       );
+      if (acceptingMatches) await load();
       setMessage(
         acceptingMatches
           ? `${court.name} is active and can receive new matches.`
