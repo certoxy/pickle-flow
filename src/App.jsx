@@ -264,14 +264,41 @@ const PUBLIC_PAGES = {
     intro: "PickleFlow gives the organizer one view of court availability, active matches, the waiting queue, and the next paired match.",
     image: "/product-previews/match-board.svg",
     imageAlt: "PickleFlow multi-court Match Board with active and upcoming matches",
-    updated: "October 21, 2026",
+    updated: "November 9, 2026",
     sections: [
       { title: "Pair Before a Court Is Available", copy: "Automatic assignment can create the next fair match while all courts are busy. The match remains marked court-pending until a court becomes available." },
+      { title: "Category-based Courts", copy: "Organizers can create player categories, assign multiple skill levels to each category, and dedicate courts to one category. Each skill belongs to only one category, and matches are assigned only to a court with the same category." },
+      { title: "Deactivate Without Interrupting Play", copy: "A busy court can be deactivated for new assignments while its current game continues. After that game finishes, the court is hidden from the operational dashboard until the organizer reactivates it." },
       { title: "Protect Each Court from Duplicate Assignments", copy: "PickleFlow prevents a second active or queued match from being assigned to a court that already has one. If older data contains a collision, the extra queued match is returned to the pending position." },
       { title: "Court-specific Mobile Scoring", copy: "An organizer can provide a court scoring link or QR code. The scorer sees the assigned game, serving team and service number, while scores synchronize to the organizer and Match Board when online." },
       { title: "Large-screen Match Board", copy: "A smart TV display can show court activity, scores, serving side, waiting players, court-pending matches, recent results, and standings." }
     ],
-    related: ["/open-play-management", "/live-pickleball-scoring", "/offline-scoring"],
+    related: ["/skill-based-open-play", "/open-play-management", "/live-pickleball-scoring", "/offline-scoring"],
+  },
+  "/skill-based-open-play": {
+    path: "/skill-based-open-play",
+    eyebrow: "Player categories and skill-based courts",
+    title: "Organize Open Play by Player Category and Skill Level",
+    seoTitle: "Skill-Based Pickleball Open Play & Court Categories | PickleFlow",
+    description: "Create pickleball player categories, group multiple skill levels, assign categories to courts, and calculate separate standings and champions.",
+    intro: "PickleFlow helps organizers run mixed-skill Open Play in one event while keeping court rotations, upcoming matches, standings, and player highlights separated by category.",
+    image: "/product-previews/game-day.svg",
+    imageAlt: "PickleFlow matches grouped by player category with category-based court assignments",
+    updated: "November 9, 2026",
+    article: true,
+    sections: [
+      { title: "Create Event-specific Player Categories", copy: "Organizers can create divisions such as New Players, Rookies, Beginners, Intermediate, or Advanced. Category names are specific to the event." },
+      { title: "Assign Multiple Skills to One Category", copy: "A category may contain several event skill levels, but each skill level belongs to only one category at a time. Moving a skill automatically changes which category governs those players." },
+      { title: "Dedicate Courts to Categories", copy: "Each court can be assigned to one player category. Matches permanently store their category and can only be placed on a court with the same category." },
+      { title: "Keep Next Matches Moving Independently", copy: "Each category can prepare its own court-pending Next Match, so a Beginners match waiting for a court does not block a Rookies match from using an available Rookies court." },
+      { title: "Separate Rankings and Highlights", copy: "Event standings, Overall Champion calculations, winning-percentage leaders, and accumulated-score leaders can be viewed separately for each category." },
+    ],
+    faq: [
+      ["Can one skill belong to two categories?", "No. A skill level can belong to only one category in an event."],
+      ["Can one court serve multiple categories?", "A court is assigned to one category at a time. The organizer can change that assignment in Game Settings."],
+      ["Are standings combined?", "No. The organizer can select a category and view that category's own ranking, champion, and Top 5 highlights."],
+    ],
+    related: ["/court-management", "/open-play-management", "/player-standings"],
   },
   "/player-standings": {
     path: "/player-standings",
@@ -282,20 +309,21 @@ const PUBLIC_PAGES = {
     intro: "PickleFlow derives standings from completed games and displays the ranking inputs so organizers and players can understand the results.",
     image: "/product-previews/game-day.svg",
     imageAlt: "PickleFlow player standings and champion highlights",
-    updated: "October 21, 2026",
+    updated: "November 9, 2026",
     article: true,
     sections: [
       { title: "Statistics from Completed Games", copy: "For each checked-in player, PickleFlow calculates games played, wins, losses, winning percentage, accumulated team score, points allowed, and point differential." },
       { title: "Champion Eligibility", copy: "The eligible group includes players who completed at least one fewer game than the event maximum, with a minimum requirement of one completed game." },
       { title: "Ranking and Tie-breakers", copy: "Eligible players are ordered by winning percentage, then wins, point differential, accumulated score, and finally the fewest points allowed. An exact tie across those inputs produces co-champions." },
       { title: "Top 5 Player Highlights", copy: "Separate Top 5 lists show winning percentage leaders and accumulated-score leaders. Organizers can download the champion and leaderboard cards as shareable images." },
+      { title: "Rankings by Player Category", copy: "When an event uses player categories, each category has its own standings, champion calculation, winning-percentage leaders, and total-score leaders." },
       { title: "Product-specific Methodology", copy: "This is PickleFlow's event-ranking method, not an official tournament rule. Organizers should publish their chosen event rules before play begins." }
     ],
     faq: [
       ["Why is the highest total score not automatically the champion?", "Accumulated score rewards total scoring but also increases with games played. PickleFlow therefore uses winning percentage first for the Overall Champion calculation."],
       ["Can two players be champions?", "Yes. Players are shown as co-champions when all published ranking and tie-breaker values are exactly equal."]
     ],
-    related: ["/open-play-management", "/fair-player-rotation", "/faq"],
+    related: ["/skill-based-open-play", "/open-play-management", "/fair-player-rotation", "/faq"],
   },
   "/live-pickleball-scoring": {
     path: "/live-pickleball-scoring",
@@ -323,14 +351,15 @@ const PUBLIC_PAGES = {
     title: "PickleFlow Frequently Asked Questions",
     seoTitle: "PickleFlow FAQ | Open Play, Offline Scoring & Courts",
     description: "Answers about PickleFlow registration, fair player rotation, offline Game Day, court scoring, standings, data retention, and organizer limits.",
-    intro: "These answers describe the current PickleFlow application and its practical limits as of October 21, 2026.",
+    intro: "These answers describe the current PickleFlow application and its practical limits as of November 9, 2026.",
     image: "/product-previews/event-roster.svg",
     imageAlt: "PickleFlow organizer workspace",
-    updated: "October 21, 2026",
+    updated: "November 9, 2026",
     faq: [
       ["Is PickleFlow free?", "Organizer registration and the current core event workflow are free. Donations are optional. Active-event limits apply, and approved donation packages can increase an organizer's limit."],
       ["What player statuses are available?", "Players move through Check In, Join Queue, Waiting, In-Game, and Out states during Game Day."],
       ["How does automatic match creation work?", "When enabled and enough eligible players are waiting, PickleFlow prepares the next pairing using games played and queue position, then assigns it when a court is available."],
+      ["Can one event have different player divisions?", "Yes. Organizers can create player categories, assign one or more skills to each category, dedicate courts to categories, and view separate standings and champions."],
       ["Can PickleFlow work without internet?", "Selected organizer operations continue for a previously loaded event in the same browser. The app synchronizes pending local changes after connectivity returns."],
       ["How long is detailed event data retained?", "The current policy schedules detailed event data for deletion 72 hours after event completion. The retained event summary may include the event name and aggregate player and game counts."],
       ["Can players score games from their phones?", "Yes. The organizer can share a court-specific scoring link or QR code. Online changes update the organizer dashboard and Match Board."],
@@ -385,7 +414,7 @@ function MarketingPage({ page, onStart }) {
         url: origin + "/",
         applicationCategory: "SportsApplication",
         operatingSystem: "Web",
-        description: "Web-based pickleball event management software for open play, player rotation, court assignments, scoring and standings.",
+        description: "Web-based pickleball event management software for player categories, skill-based courts, fair rotation, automatic next matches, live scoring, offline Game Day, and category standings.",
         publisher: { "@id": "https://paotechs.com/#organization" },
       },
       {
@@ -394,7 +423,7 @@ function MarketingPage({ page, onStart }) {
         url: origin + page.path,
         name: page.seoTitle || page.title,
         description: page.description,
-        dateModified: "2026-10-21",
+        dateModified: "2026-11-09",
         about: { "@id": origin + "/#software" },
         publisher: { "@id": "https://paotechs.com/#organization" },
       },
@@ -406,7 +435,7 @@ function MarketingPage({ page, onStart }) {
         headline: page.title,
         description: page.description,
         mainEntityOfPage: origin + page.path,
-        dateModified: "2026-10-21",
+        dateModified: "2026-11-09",
         publisher: { "@id": "https://paotechs.com/#organization" },
       });
     }
@@ -422,6 +451,7 @@ function MarketingPage({ page, onStart }) {
     "/fair-player-rotation": "Fair player rotation",
     "/offline-scoring": "Offline scoring and recovery",
     "/court-management": "Court and queue management",
+    "/skill-based-open-play": "Skill-based Open Play",
     "/player-standings": "Standings and champion method",
     "/live-pickleball-scoring": "Live mobile scoring",
     "/faq": "Organizer FAQ",
@@ -669,8 +699,11 @@ function Landing({ onStart, onLogin }) {
               <article><WifiOff /><div><h3>Offline Game Day</h3><p>Add and check in players, update statuses, manage the queue, assign matches, and record scores locally. Changes sync automatically when internet returns.</p></div></article>
               <article><Swords /><div><h3>Fair Open Play rotation</h3><p>Prioritize players with fewer games and rotate partners whenever possible before repeating a pairing.</p></div></article>
               <article><Activity /><div><h3>Automatic next matches</h3><p>Prepare the next fair pairing while courts are occupied, then assign it automatically when a court becomes available.</p></div></article>
+              <article><Users /><div><h3>Player categories & custom skills</h3><p>Create event-specific categories, group multiple skill levels, and keep every skill assigned to one clear division.</p></div></article>
+              <article><Settings2 /><div><h3>Category-based courts</h3><p>Assign each court to a category and automatically route matches only to compatible courts, with an independent Next Match per category.</p></div></article>
               <article><Phone /><div><h3>Live mobile scoring</h3><p>Score each court from a phone, track first and second serve, and update the organizer dashboard instantly.</p></div></article>
-              <article><Trophy /><div><h3>Champion and player highlights</h3><p>Calculate the Open Play champion, winning percentage, total scores, and downloadable Top 5 images.</p></div></article>
+              <article><Trophy /><div><h3>Rankings by category</h3><p>Calculate separate standings, champions, winning-percentage leaders, total scores, and downloadable Top 5 images for each category.</p></div></article>
+              <article><Edit3 /><div><h3>Flexible player & court controls</h3><p>Edit player details and skill levels, group match cards by category, and deactivate a court after its current game without disrupting play.</p></div></article>
               <article><MonitorUp /><div><h3>Live venue Match Board</h3><p>Show active scores, who is serving, the waiting queue, court-pending matches, and recent winners on a TV.</p></div></article>
             </div>
           </section>
@@ -714,6 +747,7 @@ function Landing({ onStart, onLogin }) {
           <nav className="seo-link-grid" aria-label="Explore PickleFlow features">
             <a href="/how-it-works"><strong>How PickleFlow works</strong><span>Follow the complete organizer workflow.</span></a>
             <a href="/open-play-management"><strong>Open Play management</strong><span>Fair queues, rotations, automatic matches, and offline continuity.</span></a>
+            <a href="/skill-based-open-play"><strong>Skill-based Open Play</strong><span>Create player categories, dedicate courts, and rank each division separately.</span></a>
             <a href="/fair-player-rotation"><strong>Fair player rotation</strong><span>See how games played and partner history affect pairing.</span></a>
             <a href="/offline-scoring"><strong>Offline Game Day</strong><span>What continues locally and how reconnect synchronization works.</span></a>
             <a href="/court-management"><strong>Court management</strong><span>Manage courts, queues, and court-pending matches.</span></a>

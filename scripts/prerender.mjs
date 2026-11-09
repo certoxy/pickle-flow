@@ -49,14 +49,21 @@ const pages = {
     description: "Manage multiple pickleball courts, waiting players, court-pending matches, mobile scoring links, and live venue updates.",
     h1: "Manage Pickleball Courts, Queues, and Upcoming Matches",
     intro: "PickleFlow gives the organizer one view of court availability, active matches, the waiting queue, and the next paired match.",
-    sections: [["Court-pending matches", "Prepare the next pairing while courts are occupied and assign it when a court becomes available."], ["Mobile scoring", "Share a court-specific scoring link or QR code and synchronize scores to the organizer and Match Board when online."], ["Large-screen Match Board", "Show active scores, serving side, waiting players, upcoming matches, recent results, and standings."]],
+    sections: [["Court-pending matches", "Prepare the next pairing while courts are occupied and assign it when a court becomes available."], ["Category-based courts", "Assign one player category to each court and route matches only to courts with the same category."], ["Graceful court deactivation", "Stop new assignments while the current game finishes, then hide the idle court until it is reactivated."], ["Mobile scoring", "Share a court-specific scoring link or QR code and synchronize scores to the organizer and Match Board when online."], ["Large-screen Match Board", "Show active scores, serving side, waiting players, upcoming matches, recent results, and standings."]],
+  },
+  "/skill-based-open-play": {
+    title: "Skill-Based Pickleball Open Play & Court Categories | PickleFlow",
+    description: "Create pickleball player categories, group multiple skill levels, assign categories to courts, and calculate separate standings and champions.",
+    h1: "Organize Open Play by Player Category and Skill Level",
+    intro: "Run mixed-skill Open Play in one event while keeping court rotations, upcoming matches, standings, and player highlights separated by category.",
+    sections: [["Event-specific player categories", "Create divisions such as Rookies, Beginners, Intermediate, or Advanced and assign multiple skill levels to each category."], ["One category per skill and court", "Each skill belongs to one category, and each court receives matches from one category at a time."], ["Independent Next Matches", "A court-pending match in one category does not block another category from using an available compatible court."], ["Category standings and champions", "View separate rankings, champion calculations, winning-percentage leaders, and accumulated-score leaders for every category."]],
   },
   "/player-standings": {
     title: "Open Play Standings & Champion Methodology | PickleFlow",
     description: "Understand PickleFlow player standings, winning percentage, accumulated score, eligibility, and Overall Champion tie-breakers.",
     h1: "Pickleball Open Play Standings and Overall Champion",
     intro: "PickleFlow derives standings from completed games and displays the ranking inputs so organizers and players can understand the results.",
-    sections: [["Statistics from completed games", "Games played, wins, losses, winning percentage, accumulated score, points allowed, and point differential are calculated."], ["Champion eligibility", "Eligible players completed at least one fewer game than the event maximum, with a minimum of one game."], ["Tie-breakers", "Winning percentage, wins, point differential, accumulated score, then fewest points allowed. Exact ties produce co-champions."]],
+    sections: [["Statistics from completed games", "Games played, wins, losses, winning percentage, accumulated score, points allowed, and point differential are calculated."], ["Rankings by category", "Each player category has its own standings, champion, winning-percentage leaders, and accumulated-score leaders."], ["Champion eligibility", "Eligible players completed at least one fewer game than the event maximum, with a minimum of one game."], ["Tie-breakers", "Winning percentage, wins, point differential, accumulated score, then fewest points allowed. Exact ties produce co-champions."]],
   },
   "/live-pickleball-scoring": {
     title: "Live Mobile Pickleball Scoring & Match Board | PickleFlow",
@@ -69,7 +76,7 @@ const pages = {
     title: "PickleFlow FAQ | Open Play, Offline Scoring & Courts",
     description: "Answers about PickleFlow registration, fair player rotation, offline Game Day, court scoring, standings, and data retention.",
     h1: "PickleFlow Frequently Asked Questions",
-    intro: "Current answers for pickleball organizers as of October 21, 2026.",
+    intro: "Current answers for pickleball organizers as of November 9, 2026.",
     sections: [["Is PickleFlow free?", "Organizer registration and the current core event workflow are free. Donations are optional and active-event limits apply."], ["Can PickleFlow work without internet?", "Selected organizer operations continue for a previously loaded event in the same browser."], ["Does PickleFlow guarantee perfect fairness?", "No. It prioritizes fewer games and minimizes repeated partnerships where possible, but real event conditions affect outcomes."], ["How long is detailed event data retained?", "Detailed event data is scheduled for deletion 72 hours after event completion, while a limited event summary may be retained."]],
   },
 };
@@ -83,16 +90,16 @@ const template = await readFile("dist/index.html", "utf8");
 for (const [route, page] of Object.entries(pages)) {
   const canonical = origin + route;
   const content = `<main class="seo-page" data-prerendered="true">
-    <section class="seo-hero"><div><p class="eyebrow">PickleFlow organizer guide</p><h1>${escapeHtml(page.h1)}</h1><p>${escapeHtml(page.intro)}</p><p><a href="/">Open PickleFlow</a></p><small>Published by PAOTECHS · Last updated October 21, 2026</small></div></section>
+    <section class="seo-hero"><div><p class="eyebrow">PickleFlow organizer guide</p><h1>${escapeHtml(page.h1)}</h1><p>${escapeHtml(page.intro)}</p><p><a href="/">Open PickleFlow</a></p><small>Published by PAOTECHS · Last updated November 9, 2026</small></div></section>
     <section class="seo-content">${page.sections.map(([heading, copy]) => `<article><h2>${escapeHtml(heading)}</h2><p>${escapeHtml(copy)}</p></article>`).join("")}</section>
-    <nav class="seo-related" aria-label="PickleFlow guides"><a href="/open-play-management">Open Play management</a> <a href="/fair-player-rotation">Fair rotation</a> <a href="/offline-scoring">Offline scoring</a> <a href="/court-management">Court management</a> <a href="/player-standings">Standings</a> <a href="/faq">FAQ</a></nav>
+    <nav class="seo-related" aria-label="PickleFlow guides"><a href="/open-play-management">Open Play management</a> <a href="/skill-based-open-play">Skill-based Open Play</a> <a href="/fair-player-rotation">Fair rotation</a> <a href="/offline-scoring">Offline scoring</a> <a href="/court-management">Court management</a> <a href="/player-standings">Standings</a> <a href="/faq">FAQ</a></nav>
   </main>`;
   const schema = JSON.stringify({
     "@context": "https://schema.org",
     "@graph": [
       { "@type": "Organization", "@id": "https://paotechs.com/#organization", name: "PAOTECHS", url: "https://paotechs.com/" },
       { "@type": "SoftwareApplication", "@id": origin + "/#software", name: "PickleFlow", url: origin + "/", applicationCategory: "SportsApplication", operatingSystem: "Web", publisher: { "@id": "https://paotechs.com/#organization" } },
-      { "@type": "WebPage", "@id": canonical + "#webpage", url: canonical, name: page.title, description: page.description, dateModified: "2026-10-21", about: { "@id": origin + "/#software" }, publisher: { "@id": "https://paotechs.com/#organization" } },
+      { "@type": "WebPage", "@id": canonical + "#webpage", url: canonical, name: page.title, description: page.description, dateModified: "2026-11-09", about: { "@id": origin + "/#software" }, publisher: { "@id": "https://paotechs.com/#organization" } },
     ],
   });
   let html = template
