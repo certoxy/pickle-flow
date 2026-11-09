@@ -1812,6 +1812,9 @@ select:focus {
 .court-chip.disabled {
   opacity: 0.55;
 }
+.court-chip.not-accepting { border-color:#e2a46d; background:#fff7ed; color:#9a4f12; }
+.court-chip.in_use.not-accepting { background:#9a4f12; color:#fff; }
+.court-chip.in_use.not-accepting span { color:rgba(255,255,255,.78); }
 .checkin-list,
 .queue-list,
 .match-list,
