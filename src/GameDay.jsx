@@ -402,6 +402,30 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const monitoredGames = monitoredCourt
     ? activeGames.filter((game) => game.court_id === monitoredCourt)
     : activeGames;
+  const groupedMonitoredGames = playerCategories
+    .map((category) => ({
+      id: category.id,
+      name: category.name,
+      games: monitoredGames.filter((game) => game.category_id === category.id),
+    }))
+    .filter((group) => group.games.length)
+    .concat(
+      monitoredGames.some(
+        (game) =>
+          !game.category_id ||
+          !playerCategories.some((category) => category.id === game.category_id),
+      )
+        ? [{
+            id: "uncategorized",
+            name: "Uncategorized",
+            games: monitoredGames.filter(
+              (game) =>
+                !game.category_id ||
+                !playerCategories.some((category) => category.id === game.category_id),
+            ),
+          }]
+        : [],
+    );
   const activePlayerIds = new Set(
     gamePlayers
       .filter((entry) => activeGames.some((game) => game.id === entry.game_id))
@@ -2873,7 +2897,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             </select>
           </div>
           <div className="match-list">
-            {monitoredGames.map((game) => (
+            {groupedMonitoredGames.map((group) => (
+              <section className="match-category-group" key={group.id}>
+                <div className="match-category-heading">
+                  <div><span>Player category</span><h4>{group.name}</h4></div>
+                  <strong>{group.games.length} {group.games.length === 1 ? "match" : "matches"}</strong>
+                </div>
+                <div className="match-category-grid">
+                {group.games.map((game) => (
               <article
                 className={`match-card ${game.status} ${isNextMatch(game) ? "next-match" : ""}`}
                 key={game.id}
@@ -3000,6 +3031,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                   </div>
                 )}
               </article>
+                ))}
+                </div>
+              </section>
             ))}
             {!monitoredGames.length && (
               <p className="muted">No queued or active matches.</p>
