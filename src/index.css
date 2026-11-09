@@ -1971,6 +1971,12 @@ select:focus {
   border-radius: 14px;
   background: #f9fbfc;
 }
+.match-category-group { display:grid; gap:9px; min-width:0; }
+.match-category-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:3px 2px; border-bottom:1px solid var(--border); }
+.match-category-heading span { display:block; color:var(--muted); font-size:.65rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+.match-category-heading h4 { margin:2px 0 7px; color:var(--navy); font-size:1rem; }
+.match-category-heading > strong { color:var(--blue); font-size:.76rem; }
+.match-category-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:9px; align-items:start; }
 .match-card.playing {
   border-color: #88bde9;
   box-shadow: inset 4px 0 var(--blue);
@@ -2404,7 +2410,7 @@ select:focus {
     overflow: visible;
   }
   .game-day-workspace .match-list {
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: 1fr;
     max-height: none;
     overflow: visible;
     align-items: start;
