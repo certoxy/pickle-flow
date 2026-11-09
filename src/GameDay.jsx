@@ -444,6 +444,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     gamePlayerIds(game).every((playerId) => courtAllowsPlayer(court, playerId));
   const courtCanAcceptMatch = (court, game = null) =>
     court.status === "available" &&
+    court.accepting_matches !== false &&
     !activeGames.some((activeGame) => activeGame.court_id === court.id) &&
     (!game || courtAllowsGame(court, game));
   const isNextMatch = (game) =>
@@ -1082,18 +1083,38 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   }
 
   async function toggleCourt(court) {
-    const status = court.status === "disabled" ? "available" : "disabled";
+    const acceptingMatches = court.accepting_matches === false;
+    const payload = {
+      accepting_matches: acceptingMatches,
+      ...(court.status === "disabled" && acceptingMatches ? { status: "available" } : {}),
+    };
+    if (!navigator.onLine) {
+      enqueueGameDayOperation(event.id, "update_court_availability", {
+        courtId: court.id,
+        payload,
+      });
+      setPendingOperationCount(pendingGameDayOperations(event.id).length);
+      setCourts((items) => items.map((item) => item.id === court.id ? { ...item, ...payload } : item));
+      setMessage(`Offline · ${court.name} ${acceptingMatches ? "activated" : "deactivated for new matches"}.`);
+      return;
+    }
     const { error } = await supabase
       .from("event_courts")
-      .update({ status })
+      .update(payload)
       .eq("id", court.id);
     if (error) setMessage(error.message);
-    else
+    else {
       setCourts(
         courts.map((item) =>
-          item.id === court.id ? { ...item, status } : item,
+          item.id === court.id ? { ...item, ...payload } : item,
         ),
       );
+      setMessage(
+        acceptingMatches
+          ? `${court.name} is active and can receive new matches.`
+          : `${court.name} is deactivated. Its current game may finish, but no new match will be assigned.`,
+      );
+    }
   }
 
   function beginCourtRename(court) {
@@ -2055,6 +2076,12 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         ({ error } = await supabase
           .from("event_courts")
           .update({ category_id: payload.categoryId })
+          .eq("id", payload.courtId)
+          .eq("event_id", event.id));
+      } else if (type === "update_court_availability") {
+        ({ error } = await supabase
+          .from("event_courts")
+          .update(payload.payload)
           .eq("id", payload.courtId)
           .eq("event_id", event.id));
       } else if (type === "add_player") {
@@ -3051,8 +3078,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                     <button type="submit" className="court-icon-button save" disabled={savingCourtName || !editingCourtName.trim()} aria-label="Save court name" title="Save"><Check size={17} /></button>
                     <button type="button" className="court-icon-button" onClick={cancelCourtRename} disabled={savingCourtName} aria-label="Cancel court rename" title="Cancel"><X size={17} /></button>
                   </form> : <>
-                    <button className={`court-chip ${court.status}`} disabled={court.status === "in_use"} onClick={() => toggleCourt(court)}>
-                      {court.name}<span>{court.status.replace("_", " ")}</span>
+                    <button className={`court-chip ${court.status} ${court.accepting_matches === false ? "not-accepting" : ""}`} onClick={() => toggleCourt(court)} title={court.accepting_matches === false ? "Activate this court for new matches" : "Deactivate after the current game"}>
+                      {court.name}<span>{court.accepting_matches === false ? (court.status === "in_use" ? "finishing current game · deactivated" : "deactivated") : court.status.replace("_", " ")}</span>
                     </button>
                     <button className="court-icon-button" onClick={() => beginCourtRename(court)} aria-label={`Edit ${court.name} name`} title="Edit court name"><Edit3 size={17} /></button>
                     <button className="court-link-button" data-tour="scoring-link" onClick={() => openScoringLink(court)} aria-label={`Create ${court.name} scoring link`} title="Umpire scoring link"><Link size={17} /></button>
