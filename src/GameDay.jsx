@@ -31,6 +31,12 @@ import {
 import { QRCodeCanvas } from "qrcode.react";
 import QrScanner from "./QrScanner";
 import ContextualTour from "./ContextualTour";
+import {
+  DEFAULT_SKILL_LEVELS,
+  loadEventSkillLevels,
+  skillLevelLabel,
+  skillLevelRating,
+} from "./lib/skillLevels";
 import { supabase } from "./lib/supabase";
 import {
   acknowledgePendingScore,
@@ -48,21 +54,6 @@ import {
 
 const playerName = (players, id) =>
   players.find((player) => player.id === id)?.full_name || "Unknown player";
-
-const skillLevelLabel = (value) =>
-  value === "novice"
-    ? "New Player"
-    : String(value || "")
-        .replaceAll("_", " ")
-        .replace(/\b\w/g, (letter) => letter.toUpperCase());
-
-const SKILL_RATINGS = {
-  novice: 1,
-  beginner: 2,
-  intermediate: 3,
-  advanced: 4,
-  competitive: 5,
-};
 
 const SKILL_MODE_LABELS = {
   balanced: "Balanced Matches",
@@ -110,6 +101,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const [queue, setQueue] = useState([]);
   const [games, setGames] = useState([]);
   const [gamePlayers, setGamePlayers] = useState([]);
+  const [skillLevels, setSkillLevels] = useState(DEFAULT_SKILL_LEVELS);
   const [courtName, setCourtName] = useState("");
   const [editingCourtId, setEditingCourtId] = useState(null);
   const [editingCourtName, setEditingCourtName] = useState("");
@@ -177,6 +169,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         setGames(normalized.games);
         setGamePlayers(cached.gamePlayers || []);
         setScores(cached.scores || {});
+        setSkillLevels(cached.skillLevels || DEFAULT_SKILL_LEVELS);
         setPendingScoreCount(pendingScoresForEvent(event.id).length);
         setPendingOperationCount(pendingGameDayOperations(event.id).length);
         setMessage("Offline Game Day restored from this browser.");
@@ -186,7 +179,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       setLoading(false);
       return;
     }
-    const [playerResult, courtResult, queueResult, gameResult] =
+    const [playerResult, courtResult, queueResult, gameResult, loadedSkillLevels] =
       await Promise.all([
         supabase
           .from("player_registrations")
@@ -210,6 +203,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           .select("*")
           .eq("event_id", event.id)
           .order("game_number", { ascending: false }),
+        loadEventSkillLevels(event.id, true),
       ]);
     const normalized = normalizeCourtAssignments(gameResult.data || []);
     const loadedGames = normalized.games;
@@ -227,6 +221,16 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     setQueue(queueResult.data || []);
     setGames(loadedGames);
     setGamePlayers(participantResult.data || []);
+    setSkillLevels(loadedSkillLevels);
+    setNewPlayer((current) =>
+      loadedSkillLevels.some((level) => level.is_active && level.code === current.skill_level)
+        ? current
+        : {
+            ...current,
+            skill_level:
+              loadedSkillLevels.find((level) => level.is_active)?.code || "beginner",
+          },
+    );
     const pending = pendingScoresForEvent(event.id);
     setPendingScoreCount(pending.length);
     setScores(Object.fromEntries(loadedGames.map((game) => {
@@ -264,8 +268,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       games,
       gamePlayers,
       scores,
+      skillLevels,
     });
-  }, [event.id, gamePlayers, games, loading, players, queue, scores, courts]);
+  }, [event.id, gamePlayers, games, loading, players, queue, scores, courts, skillLevels]);
 
   useEffect(() => {
     courtDataRef.current = { players, gamePlayers, scores };
@@ -711,7 +716,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
 
   function playerSkillRating(playerId) {
     const skill = players.find((player) => player.id === playerId)?.skill_level;
-    return SKILL_RATINGS[skill] || SKILL_RATINGS.beginner;
+    return skillLevelRating(skill, skillLevels);
   }
 
   function arrangeOpenPlayPartners(playerIds) {
@@ -2883,11 +2888,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 setNewPlayer({ ...newPlayer, skill_level: e.target.value })
               }
             >
-              <option value="novice">New Player</option>
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-              <option value="competitive">Competitive</option>
+              {skillLevels
+                .filter((level) => level.is_active)
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map((level) => (
+                  <option key={level.id || level.code} value={level.code}>
+                    {level.name}
+                  </option>
+                ))}
             </select>
             <button className="button button-primary" disabled={addingPlayer}>
               <Plus size={16} />
@@ -2908,7 +2916,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 <div className="checkin-row" key={player.id}>
                   <div>
                     <strong>{player.full_name}</strong>
-                    <span>{skillLevelLabel(player.skill_level)}</span>
+                    <span>{skillLevelLabel(player.skill_level, skillLevels)}</span>
                   </div>
                   <div className="checkin-actions">
                     <button
