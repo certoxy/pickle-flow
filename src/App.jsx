@@ -73,6 +73,13 @@ const emptyPlayer = {
   skill_level: "beginner",
 };
 
+const skillLevelLabel = (value) =>
+  value === "novice"
+    ? "New Player"
+    : String(value || "")
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
 async function sendNotification(type, payload) {
   try {
     await supabase.functions.invoke("send-notification", { body: { type, ...payload } });
@@ -1979,7 +1986,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
         player.full_name,
         player.email,
         player.phone || "",
-        player.skill_level,
+        skillLevelLabel(player.skill_level),
         player.status,
         player.created_at,
       ]),
@@ -2089,7 +2096,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
         index + 1,
         player.full_name,
         player.email || player.phone || "—",
-        label(player.skill_level),
+        skillLevelLabel(player.skill_level),
         label(player.status),
       ]),
       headStyles: { fillColor: green, textColor: 255, fontStyle: "bold" },
@@ -2129,7 +2136,10 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
       const full_name = (values[nameIndex] || "").trim();
       const email = emailIndex >= 0 ? (values[emailIndex] || "").trim() : "";
       const phone = phoneIndex >= 0 ? (values[phoneIndex] || "").trim() : "";
-      const skill = skillIndex >= 0 ? (values[skillIndex] || "beginner").trim().toLowerCase().replaceAll(" ", "_") : "beginner";
+      const importedSkill = skillIndex >= 0
+        ? (values[skillIndex] || "beginner").trim().toLowerCase().replaceAll(" ", "_")
+        : "beginner";
+      const skill = importedSkill === "new_player" ? "novice" : importedSkill;
       const key = full_name.toLowerCase();
       let error = "";
       if (!full_name) error = "Full name is required";
@@ -2343,7 +2353,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
       ]} />
       {showImport && <section className="inline-panel import-panel">
         <div className="import-heading"><div><h3>Import player list</h3><p className="muted">Review the file before importing. Email and phone are optional.</p></div><button className="text-button compact" onClick={downloadImportTemplate}><Download size={15} /> Download template</button></div>
-        <div className="import-preview"><table className="player-table"><thead><tr><th>Row</th><th>Player</th><th>Contact</th><th>Skill</th><th>Validation</th></tr></thead><tbody>{importRows.map((row) => <tr key={row.row}><td>{row.row}</td><td><strong>{row.full_name || "Missing name"}</strong></td><td>{row.email || row.phone || "—"}</td><td className="capitalize">{row.skill_level.replaceAll("_", " ")}</td><td><span className={`import-status ${row.error ? "invalid" : "valid"}`}>{row.error || "Ready"}</span></td></tr>)}</tbody></table></div>
+        <div className="import-preview"><table className="player-table"><thead><tr><th>Row</th><th>Player</th><th>Contact</th><th>Skill</th><th>Validation</th></tr></thead><tbody>{importRows.map((row) => <tr key={row.row}><td>{row.row}</td><td><strong>{row.full_name || "Missing name"}</strong></td><td>{row.email || row.phone || "—"}</td><td className="capitalize">{skillLevelLabel(row.skill_level)}</td><td><span className={`import-status ${row.error ? "invalid" : "valid"}`}>{row.error || "Ready"}</span></td></tr>)}</tbody></table></div>
         <div className="dialog-actions"><button className="button button-secondary" onClick={() => { setShowImport(false); setImportRows([]); }} disabled={importing}>Cancel</button><button className="button button-secondary" onClick={downloadImportTemplate}><Download size={16} /> Template</button><button className="button button-primary" onClick={importPlayers} disabled={importing || !importRows.some((row) => !row.error)}><FileUp size={16} /> {importing ? "Importing…" : `Import ${importRows.filter((row) => !row.error).length} players`}</button></div>
       </section>}
       {showWalkIn && registrationOpen && (
@@ -2392,7 +2402,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
                   setWalkIn({ ...walkIn, skill_level: e.target.value })
                 }
               >
-                <option value="novice">Novice</option>
+                <option value="novice">New Player</option>
                 <option value="beginner">Beginner</option>
                 <option value="intermediate">Intermediate</option>
                 <option value="advanced">Advanced</option>
@@ -2430,7 +2440,7 @@ function EventPlayers({ event, onBack, onEdit, onGameDay, onEventUpdated }) {
                     <strong>{player.full_name}</strong>
                   </td>
                   <td data-label="Skill level" className="capitalize">
-                    {player.skill_level}
+                    {skillLevelLabel(player.skill_level)}
                   </td>
                   <td data-label="Contact">
                     <div className="desktop-contact">
@@ -3096,7 +3106,7 @@ function PublicRegistration({ code, onHome }) {
                     setForm({ ...form, skill_level: e.target.value })
                   }
                 >
-                  <option value="novice">Novice</option>
+                  <option value="novice">New Player</option>
                   <option value="beginner">Beginner</option>
                   <option value="intermediate">Intermediate</option>
                   <option value="advanced">Advanced</option>

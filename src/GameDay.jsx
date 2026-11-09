@@ -49,6 +49,13 @@ import {
 const playerName = (players, id) =>
   players.find((player) => player.id === id)?.full_name || "Unknown player";
 
+const skillLevelLabel = (value) =>
+  value === "novice"
+    ? "New Player"
+    : String(value || "")
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
 const SKILL_RATINGS = {
   novice: 1,
   beginner: 2,
@@ -2876,7 +2883,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 setNewPlayer({ ...newPlayer, skill_level: e.target.value })
               }
             >
-              <option value="novice">Novice</option>
+              <option value="novice">New Player</option>
               <option value="beginner">Beginner</option>
               <option value="intermediate">Intermediate</option>
               <option value="advanced">Advanced</option>
@@ -2901,7 +2908,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                 <div className="checkin-row" key={player.id}>
                   <div>
                     <strong>{player.full_name}</strong>
-                    <span className="capitalize">{player.skill_level}</span>
+                    <span>{skillLevelLabel(player.skill_level)}</span>
                   </div>
                   <div className="checkin-actions">
                     <button
