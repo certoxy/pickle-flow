@@ -658,6 +658,13 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     });
     return counts;
   }, [completedGameIds, gamePlayers]);
+  const rotationBaselineForPlayer = (playerId) =>
+    Number(
+      players.find((player) => player.id === playerId)?.rotation_game_baseline ||
+        0,
+    );
+  const rotationGameCount = (playerId, counts = playerGameCounts) =>
+    (counts.get(playerId) || 0) + rotationBaselineForPlayer(playerId);
   const officialEffectiveCounts = useMemo(() => {
     const counts = new Map(playerGameCounts);
     gamePlayers.forEach((entry) => {
@@ -673,7 +680,8 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   const remainingOfficialIds = officialGamesTarget
     ? officialRosterIds.filter(
         (playerId) =>
-          (officialEffectiveCounts.get(playerId) || 0) < officialGamesTarget,
+          rotationGameCount(playerId, officialEffectiveCounts) <
+          officialGamesTarget,
       )
     : [];
   const remainingOfficialSet = new Set(remainingOfficialIds);
@@ -698,7 +706,9 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     const roster = checkedIn.map((player) => player.id);
     const target = Math.max(
       1,
-      ...roster.map((playerId) => officialEffectiveCounts.get(playerId) || 0),
+      ...roster.map((playerId) =>
+        rotationGameCount(playerId, officialEffectiveCounts),
+      ),
     );
     const payload = {
       equalization_started_at: new Date().toISOString(),
@@ -873,17 +883,34 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
           )?.skill_level),
         ),
       )
-      .map((entry, queueIndex) => ({
-        id: entry.player_registration_id,
-        gamesPlayed: playerGameCounts.get(entry.player_registration_id) || 0,
-        queueIndex,
-        waitedLong:
-          now - new Date(entry.joined_at || now).getTime() >= 15 * 60 * 1000,
-        skill: playerSkillRating(entry.player_registration_id),
-      }))
+      .map((entry, queueIndex) => {
+        const id = entry.player_registration_id;
+        const gamesPlayed = playerGameCounts.get(id) || 0;
+        const rotationBaseline = rotationBaselineForPlayer(id);
+        const joinedAt = new Date(entry.joined_at || now).getTime();
+        const restCycleComplete =
+          gamesPlayed === 0 ||
+          games.some((game) => {
+            const cycleStartedAt = new Date(
+              game.started_at || game.created_at || 0,
+            ).getTime();
+            return cycleStartedAt > joinedAt;
+          });
+        return {
+          id,
+          gamesPlayed,
+          rotationGames: gamesPlayed + rotationBaseline,
+          firstGamePriority: rotationBaseline > 0 && gamesPlayed === 0,
+          restCycleComplete,
+          queueIndex,
+          waitedLong: now - joinedAt >= 15 * 60 * 1000,
+          skill: playerSkillRating(id),
+        };
+      })
       .sort(
         (a, b) =>
-          a.gamesPlayed - b.gamesPlayed ||
+          a.rotationGames - b.rotationGames ||
+          Number(b.firstGamePriority) - Number(a.firstGamePriority) ||
           Number(b.waitedLong) - Number(a.waitedLong) ||
           a.queueIndex - b.queueIndex,
       );
@@ -894,13 +921,23 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     // When fewer than four official players remain, the organizer chooses the
     // fill-ins manually so the exemption is visible before the match is made.
     if (rankedForMatch.length < playersNeeded) return [];
+    const restedPlayers = rankedForMatch.filter(
+      (player) => player.restCycleComplete,
+    );
+    const availableForMatch =
+      restedPlayers.length >= playersNeeded ? restedPlayers : rankedForMatch;
     if (event.game_format !== "open_play" || playersNeeded !== 4)
-      return rankedForMatch.slice(0, playersNeeded).map((player) => player.id);
+      return availableForMatch
+        .slice(0, playersNeeded)
+        .map((player) => player.id);
 
     // Games played always has priority. Within a fair front pool, the selected
     // mode controls how strongly skill compatibility affects the next group.
     // A player waiting at least 15 minutes receives queue priority protection.
-    const pool = rankedForMatch.slice(0, Math.min(20, rankedForMatch.length));
+    const pool = availableForMatch.slice(
+      0,
+      Math.min(20, availableForMatch.length),
+    );
     let best = null;
     for (let a = 0; a < pool.length - 3; a += 1)
       for (let b = a + 1; b < pool.length - 2; b += 1)
@@ -911,7 +948,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
               group.map((player) => player.id),
             );
             const gamesPlayed = group.reduce(
-              (total, player) => total + player.gamesPlayed,
+              (total, player) => total + player.rotationGames,
               0,
             );
             const queueCost = group.reduce(
@@ -953,7 +990,16 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             if (!best || compareMatchRank(rank, best.rank) < 0)
               best = { rank, ids: arranged };
           }
-    return best?.ids || rankedForMatch.slice(0, 4).map((player) => player.id);
+    return best?.ids || availableForMatch.slice(0, 4).map((player) => player.id);
+  }
+
+  function calculateRotationBaseline(playerId = null) {
+    const completedCounts = checkedIn
+      .filter((player) => player.id !== playerId)
+      .map((player) => playerGameCounts.get(player.id) || 0)
+      .sort((first, second) => first - second);
+    if (!completedCounts.length) return 0;
+    return completedCounts[Math.floor((completedCounts.length - 1) / 2)];
   }
 
   useEffect(() => {
@@ -1094,15 +1140,20 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   async function checkInPlayer(player) {
     if (player.checked_in_at) return;
     const checked_in_at = new Date().toISOString();
+    const rotation_game_baseline =
+      player.rotation_game_baseline ?? calculateRotationBaseline(player.id);
     if (!navigator.onLine) {
       enqueueGameDayOperation(event.id, "check_in_player", {
         playerId: player.id,
         checkedInAt: checked_in_at,
+        rotationGameBaseline: rotation_game_baseline,
       });
       setPendingOperationCount(pendingGameDayOperations(event.id).length);
       setPlayers((current) =>
         current.map((item) =>
-          item.id === player.id ? { ...item, checked_in_at } : item,
+          item.id === player.id
+            ? { ...item, checked_in_at, rotation_game_baseline }
+            : item,
         ),
       );
       const queued = await addToQueue(player.id);
@@ -1112,12 +1163,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     }
     const { error } = await supabase
       .from("player_registrations")
-      .update({ checked_in_at })
+      .update({ checked_in_at, rotation_game_baseline })
       .eq("id", player.id);
     if (error) return setMessage(error.message);
     setPlayers(
       players.map((item) =>
-        item.id === player.id ? { ...item, checked_in_at } : item,
+        item.id === player.id
+          ? { ...item, checked_in_at, rotation_game_baseline }
+          : item,
       ),
     );
     const queued = await addToQueue(player.id);
@@ -1516,6 +1569,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       return;
     }
     const checked_in_at = new Date().toISOString();
+    const rotation_game_baseline = calculateRotationBaseline();
     if (!navigator.onLine) {
       const player = {
         id: crypto.randomUUID(),
@@ -1526,6 +1580,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         phone: null,
         status: "confirmed",
         checked_in_at,
+        rotation_game_baseline,
         created_at: checked_in_at,
       };
       enqueueGameDayOperation(event.id, "add_player", { player });
@@ -1549,6 +1604,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
         phone: null,
         status: "confirmed",
         checked_in_at,
+        rotation_game_baseline,
       })
       .select()
       .single();
@@ -2211,7 +2267,10 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       } else if (type === "check_in_player") {
         ({ error } = await supabase
           .from("player_registrations")
-          .update({ checked_in_at: payload.checkedInAt })
+          .update({
+            checked_in_at: payload.checkedInAt,
+            rotation_game_baseline: payload.rotationGameBaseline,
+          })
           .eq("id", payload.playerId));
       } else if (type === "mark_player_out") {
         ({ error } = await supabase
