@@ -797,8 +797,34 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
     return counts;
   }, [completedGames, gamePlayers]);
 
+  const encounterCounts = useMemo(() => {
+    const counts = new Map();
+    completedGames.forEach((game) => {
+      const participants = gamePlayers
+        .filter((entry) => entry.game_id === game.id)
+        .map((entry) => entry.player_registration_id);
+      for (let first = 0; first < participants.length - 1; first += 1)
+        for (let second = first + 1; second < participants.length; second += 1) {
+          const key = [participants[first], participants[second]].sort().join(":");
+          counts.set(key, (counts.get(key) || 0) + 1);
+        }
+    });
+    return counts;
+  }, [completedGames, gamePlayers]);
+
   function partnershipCount(first, second) {
     return partnerCounts.get([first, second].sort().join(":")) || 0;
+  }
+
+  function encounterCount(first, second) {
+    return encounterCounts.get([first, second].sort().join(":")) || 0;
+  }
+
+  function compareMatchRank(first, second) {
+    for (let index = 0; index < first.length; index += 1) {
+      if (first[index] !== second[index]) return first[index] - second[index];
+    }
+    return 0;
   }
 
   const skillMatchingMode = event.skill_matching_mode || "balanced";
@@ -894,20 +920,38 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
             );
             const skills = group.map((player) => player.skill);
             const skillSpread = Math.max(...skills) - Math.min(...skills);
+            const priorEncounters = group.reduce(
+              (total, player, index) =>
+                total +
+                group
+                  .slice(index + 1)
+                  .reduce(
+                    (pairTotal, opponent) =>
+                      pairTotal + encounterCount(player.id, opponent.id),
+                    0,
+                  ),
+              0,
+            );
             const repeatedPartners =
               partnershipCount(arranged[0], arranged[1]) +
               partnershipCount(arranged[2], arranged[3]);
-            const modeCost =
+            const modeRank =
               skillMatchingMode === "similar_skill"
-                ? skillSpread * 1_000_000 + queueCost * 10_000
+                ? [skillSpread, queueCost]
                 : skillMatchingMode === "balanced"
-                  ? queueCost * 1_000_000 + skillSpread * 10_000
-                  : queueCost * 1_000_000;
-            const score =
-              gamesPlayed * 1_000_000_000_000 +
-              modeCost +
-              repeatedPartners;
-            if (!best || score < best.score) best = { score, ids: arranged };
+                  ? [queueCost, skillSpread]
+                  : [queueCost, 0];
+            // First keep game counts level. Then spread every group across
+            // players who have not already shared a match, whether they were
+            // partners or opponents. Queue and skill preferences break ties.
+            const rank = [
+              gamesPlayed,
+              priorEncounters,
+              repeatedPartners,
+              ...modeRank,
+            ];
+            if (!best || compareMatchRank(rank, best.rank) < 0)
+              best = { rank, ids: arranged };
           }
     return best?.ids || rankedForMatch.slice(0, 4).map((player) => player.id);
   }
