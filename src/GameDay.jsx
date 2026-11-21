@@ -1341,6 +1341,14 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
   async function updateCourtCategory(court, categoryId) {
     setMessage("");
     const payload = { category_id: categoryId || null };
+    const categoryName = playerCategories.find(
+      (category) => category.id === categoryId,
+    )?.name;
+    const assignmentMessage = `${court.name} is assigned to ${categoryName || "all players"}.${
+      court.status === "in_use"
+        ? " The current game will continue; this applies to the next match."
+        : ""
+    }`;
     if (!navigator.onLine) {
       enqueueGameDayOperation(event.id, "update_court_category", {
         courtId: court.id,
@@ -1348,7 +1356,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       });
       setPendingOperationCount(pendingGameDayOperations(event.id).length);
       setCourts((items) => items.map((item) => item.id === court.id ? { ...item, ...payload } : item));
-      setMessage(`Offline · ${court.name} category updated.`);
+      setMessage(`Offline · ${assignmentMessage}`);
       return;
     }
     const { error } = await supabase
@@ -1358,8 +1366,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
       .eq("event_id", event.id);
     if (error) return setMessage(error.message);
     setCourts((items) => items.map((item) => item.id === court.id ? { ...item, ...payload } : item));
-    const categoryName = playerCategories.find((category) => category.id === categoryId)?.name;
-    setMessage(`${court.name} is assigned to ${categoryName || "all players"}.`);
+    setMessage(assignmentMessage);
   }
 
   async function openScoringLink(court) {
@@ -3279,7 +3286,7 @@ export default function GameDay({ event, onBack, onEventUpdated }) {
                     {directConnections[court.id] && <span className={`direct-court-status ${directConnections[court.id]}`} title="Direct device sync"><Radio size={13} />{directConnections[court.id] === "connected" ? "Direct" : "Pairing"}</span>}
                   </>}</div>
                   <label className="court-category-select">Player category
-                    <select value={court.category_id || ""} disabled={court.status === "in_use"} onChange={(e) => updateCourtCategory(court, e.target.value)}>
+                    <select value={court.category_id || ""} onChange={(e) => updateCourtCategory(court, e.target.value)}>
                       <option value="">All players</option>
                       {playerCategories.filter((category) => category.is_active).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
                     </select>
